@@ -8,8 +8,9 @@
 from nonebot import on_command, on_message, get_driver
 from nonebot.rule import to_me, Rule
 from nonebot.adapters.onebot.v11 import Bot, Event
-from .game_core import search, retreat, attack, user_init, check_status,check_retreat_status,users,stop_retreat
+from .game_core import search, retreat, attack, user_init, check_status,check_retreat_status,users,stop_retreat, purchase_cheese_ticket
 from nonebot.adapters.onebot.v11 import MessageSegment
+from nonebot.params import ArgPlainText
 from nonebot.rule import Rule
 import time
 
@@ -102,7 +103,7 @@ async def _retreat_handler(bot: Bot, event: Event):
             msg += "本次搜索已获取物品："
             for item in user.inventory:
                 quality_name = quality_map.get(item.quality, "未知")
-                msg += f"\n{item.name} {quality_name} {item.value}金币"
+                msg += f"\n{item.name} {quality_name} {item.value}哈哈币"
         else:
             msg += "暂无新获取物品"
         await retreat_cmd.finish(msg)
@@ -124,22 +125,24 @@ async def _status_handler(bot: Bot, event: Event):
     msg = MessageSegment.at(qq)+"\n"
     msg += f"当前状态：{status_info['status_text']}\n"
     if(status_info['status']==1):
+        msg+=f"攻击力：{user.attack},防御力：{user.defense}\n"
         msg+=f"（距离获得下一件物品还剩{300-(int(time.time())-user.search_start_time)%300}秒）\n"
     elif(status_info['status']==2):
         if(600-int(time.time())+user.retreat_start_time<0):
-            msg+=f"本次撤离带出物品价值：{total_value}金币\n"
+            msg+=f"本次撤离带出物品价值：{total_value}哈哈币\n"
             msg+=f"撤离成功！\n"
         else:
+            msg+=f"攻击力：{user.attack},防御力：{user.defense}\n"
             msg+=f"（距离撤离完成还剩{600-int(time.time())+user.retreat_start_time}秒）\n"
     elif(status_info['status']==0):
-        msg+=f"金币：{status_info['gold']}"
+        msg+=f"哈哈币：{status_info['gold']}"
     if user.status!=0:
         msg += f"背包物品数量：{status_info['bag_items_nums']}/{user.backpack_capacity}\n"
         if user.inventory:
             msg += "本次搜索已获取物品："
             for item in user.inventory:
                 quality_name = quality_map.get(item.quality, "未知")
-                msg += f"\n{item.name} {quality_name} {item.value}金币"
+                msg += f"\n{item.name} {quality_name} {item.value}哈哈币"
     
     await status_cmd.finish(msg)
 
@@ -157,4 +160,43 @@ async def _stop_retreat_handler(bot: Bot, event: Event):
     else:
         msg += "取消撤离失败！可能未在撤离状态"
     await stop_retreat_cmd.finish(msg)
+
+
+# 起装命令：启动购买芝士券交互
+equip_start_cmd = on_command("起装", rule=is_exact_command("起装"), priority=10)
+@equip_start_cmd.handle()
+async def _equip_start( event: Event):
+    qq = event.get_user_id()
+    user = users.get(qq)
+    if not user:
+        user = user_init(qq)
+    if user.status!=0:
+        await equip_start_cmd.finish(MessageSegment.at(qq)+"\n你不在空闲状态，不能起装！")
+    current_equips = ", ".join(e.name for e in user.equipment) if user.equipment else "无"
+    prompt = (
+        MessageSegment.at(qq) + "\n"
+        + "请选择要购买的套装：\n"
+        + "0. 我后悔了，不起了\n"
+        + "1. 新兵芝士券 (50G)\n"
+        + "2. 标准芝士券 (200G)\n"
+        + "3. 精锐芝士券 (1000G)\n"
+        + "4. 特种芝士券 (5000G)\n"
+        + "警告：购买任意芝士券都会使已经装备的物品立刻被回收为哈哈币！\n"
+        + f"当前装备：{current_equips}"
+    )
+    # 标记用户处于等待选择状态（仅内存）
+    await equip_start_cmd.send(prompt)
+
+
+# 处理用户对起装的回复
+@equip_start_cmd.got("selection")
+async def _handle_pack_choice(event: Event,selection: str = ArgPlainText()):
+    qq = event.get_user_id()
+    # 仅接受 0-4 的回复
+    if selection not in ("0", "1", "2", "3", "4"):
+        await equip_start_cmd.finish(MessageSegment.at(qq)+"\n你只能在芝士券中选择！")
+
+    choice = int(selection)
+    success, msg = purchase_cheese_ticket(qq, choice)
+    await equip_start_cmd.finish(MessageSegment.at(qq)+"\n"+msg)
 

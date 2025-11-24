@@ -1,9 +1,12 @@
 import time
 import random
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from .models.game_models import User, Item
 from .item_data import items_by_quality
-from .db import init_db, load_all, save_all, save_user, save_user_items
+from .db import init_db, load_all, save_all, save_user, save_user_items, save_user_equipment
+from .equipment_data import common_equipment, rare_equipment, epic_equipment, legendary_equipment
+from dataclasses import asdict
+from .models.game_models import Equipment
 
 # 初始化数据库
 init_db()
@@ -258,40 +261,76 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     if current_time < defender.attack_protection_end_time:
         remaining_time = defender.attack_protection_end_time - current_time
         return f"攻击失败！目标处于被攻击保护中，剩余{remaining_time}秒"
-    # 计算攻击成功率：进攻方攻击力 / (进攻方攻击力 + 防守方防御力)
-    attack_success_rate = attacker.attack / (attacker.attack + defender.defense)
+    # 记录攻击开始前进攻方是否佩戴任何装备（用于结算后可能增加额外冷却）
+    attacker_had_no_equipment = not bool(attacker.equipment)
+    # 计算攻击成功率：进攻方攻击力 / (进攻方攻击力 + 防守方防御力 + 1/4 * 防守方攻击力)
+    attack_success_rate = attacker.attack / (attacker.attack + defender.defense + 0.25 * defender.attack)
     attacker.attack_cooldown_start = int(time.time())
     if random.random() >= attack_success_rate:
-        # 攻击失败：只计算进攻方的损失
-        # 损失金币 = 防守方攻击力 - 进攻方防御力，最低损失10金币
-        damage = max(10, defender.attack - attacker.defense)*2
-        attacker.gold = attacker.gold - damage
-        attacker.attack_cooldown_time = 120
-        # 保存进攻方数据到数据库
-        save_user(attacker)
-        
-        return f"没打过！你损失了{damage}金币"
-    
-    # 攻击成功
-    # 1. 抢夺防守方一件随机物品（从当前搜索物品中）
-    defender_user = users.get(defender_qq)
-    stolen_item = None
-    if defender_user and defender_user.inventory:
-        stolen_item = random.choice(defender_user.inventory)
-        attacker_user = users.get(attacker_qq)
-        # 将物品添加到进攻方当前搜索物品
-        attacker_user.inventory.append(stolen_item)
-        attacker_user.user_bag_items_nums += 1
-        # 从防守方当前搜索物品中移除
-        defender_user.inventory.remove(stolen_item)
-        defender_user.user_bag_items_nums -= 1
 
-    # 2. 计算双方损失金币
-    # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10金币
-    attacker_damage = max(10, defender.attack - attacker.defense)
-    attacker.gold = attacker.gold - attacker_damage
+        # 攻击失败：不再损失金币，改为 50% 概率被抢走一件已装备的装备
+        attacker.attack_cooldown_time += 120
+        # 若攻击发起前未佩戴装备，则在本次结算后额外增加冷却
+        if attacker_had_no_equipment:
+            attacker.attack_cooldown_time += 360
+        lost_equipment = None
+        # 使用模块级的 random，使代码更易读；同时使用已有的 defender 变量
+        if attacker.equipment and random.random() < 0.5:
+            # 随机选一件装备并移除（unequip_item 会撤销属性）
+            lost_equipment = random.choice(list(attacker.equipment))
+            attacker.unequip_item(lost_equipment)
+            # 将该装备以 Item 形式放入防守方的 inventory
+            stolen_as_item = Item(id=lost_equipment.id, name=lost_equipment.name, value=lost_equipment.value, quality=lost_equipment.quality, weight=lost_equipment.weight)
+            defender.inventory.append(stolen_as_item)
+            defender.user_bag_items_nums += 1
+            # 保存双方数据到数据库
+            save_user(attacker)
+            save_user(defender)
+            save_user_items(defender.qq, defender.inventory)
+            # 更新攻击者状态
+            save_user_equipment(attacker.qq, attacker.equipment)
+            return f"没打过！你被夺走了装备：{lost_equipment.name}，已放入对方背包！"
+        # 未丢失装备的情况
+        save_user(attacker)
+        save_user_equipment(attacker.qq, attacker.equipment)
+        return f"没打过！未损失装备或金币。"
+    
+
+    # 攻击成功
+    # 1. 抢夺防守方一件随机物品（从当前搜索物品和已装备物品中）
+    stolened_item = []
+    if defender:
+        # 抢夺池包含防守方的背包物品和已装备的装备，装备会被脱下并作为 Item 放入进攻方背包
+        steal_pool = []
+        # 背包物品（Item）
+        steal_pool.extend(list(defender.inventory))
+        if steal_pool:
+            stolen_candidate = random.choice(steal_pool)
+            defender.inventory.remove(stolen_candidate)
+            defender.user_bag_items_nums -= 1
+            attacker.inventory.append(stolen_candidate)
+            attacker.user_bag_items_nums += 1
+            stolened_item.append(stolen_candidate)
+        
+        # 装备物品（Equipment） 
+        if defender.equipment!=[]:
+            stolen_eq = random.choice(list(defender.equipment))
+            defender.unequip_item(stolen_eq)
+            stolened_eq = Equipment(id=stolen_eq.id, name=stolen_eq.name, value=stolen_eq.value, quality=stolen_eq.quality, weight=stolen_eq.weight)
+            attacker.inventory.append(stolened_eq)
+            attacker.user_bag_items_nums += 1
+            stolened_item.append(stolened_eq)
+    
+    # # 2. 计算双方损失金币
+    # # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10金币
+    # attacker_damage = max(10, defender.attack - attacker.defense)
+    # attacker.gold = attacker.gold - attacker_damage
+
     attacker.attack_cooldown_start = int(time.time())
-    attacker.attack_cooldown_time = 600
+    attacker.attack_cooldown_time += 600
+    # 若攻击发起前未佩戴装备，则在本次结算后额外增加冷却
+    if attacker_had_no_equipment:
+        attacker.attack_cooldown_time += 360
     
     # 设置被攻击保护时间
     defender.attack_protection_end_time = int(time.time()) + defender.attack_protection_duration
@@ -301,12 +340,16 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     save_user(defender)
     save_user_items(attacker.qq, attacker.inventory)
     save_user_items(defender.qq, defender.inventory)
+    save_user_equipment(defender.qq, defender.equipment)
     defender.search_start_time = int(time.time())
 
-    if stolen_item is None:
-        return f"打赢了！你损失了{attacker_damage}金币，但是没有抢夺到物品!"
-    return f"打赢了！你损失了{attacker_damage}金币，抢夺到了{stolen_item.name}!"
-
+    if stolened_item is None:
+        return f"打赢了！但是没有抢夺到物品!"
+    else:
+        msg ="打赢了！抢夺到以下物品:"
+        for st in stolened_item:
+            msg += f"\n{st.name}"
+        return msg
 
 def stop_retreat(qq: str) -> bool:
     """
@@ -345,19 +388,19 @@ def upgrade_attribute(qq: str, attribute_tag: int, amount: int) -> bool:
         user = user_init(qq)
     
     if attribute_tag == 1:
-        cost = amount * 50
+        cost = amount * 100
         if user.gold < cost:
             return False
         user.gold -= cost
         user.attack += amount
     elif attribute_tag == 2:
-        cost = amount * 50
+        cost = amount * 100
         if user.gold < cost:
             return False
         user.gold -= cost
         user.defense += amount
     elif attribute_tag == 3:
-        cost = amount * 200
+        cost = amount * 1000
         if user.gold < cost:
             return False
         user.gold -= cost
@@ -367,3 +410,116 @@ def upgrade_attribute(qq: str, attribute_tag: int, amount: int) -> bool:
     # 保存用户数据到数据库
     save_user(user)
     return True
+
+
+def _clone_equipment_template(eq_template: Equipment) -> Equipment:
+    """返回装备模板的浅拷贝（新的 Equipment 实例）。"""
+    return Equipment(**asdict(eq_template))
+
+
+def _weighted_draw_equipment(category_weights: dict, count: int) -> List[Equipment]:
+    """按类别权重抽取若干装备。
+
+    参数:
+      - category_weights: dict，键为品质（0/1/2/3），值为该类别的权重。
+      - count: 要抽取的装备数量。
+
+    抽取逻辑：对每个类别中的每件装备，以 `类别权重 * 装备.weight` 作为其最终权重构建抽取池，
+    然后从池中随机选择（不重复），并返回克隆后的 `Equipment` 实例列表。
+    若池为空则返回空列表。
+    """
+    pool = []
+    categories = {
+        0: common_equipment,
+        1: rare_equipment,
+        2: epic_equipment,
+        3: legendary_equipment,
+    }
+    for q, cat_weight in category_weights.items():
+        items = categories.get(q, [])
+        if not items or cat_weight <= 0:
+            continue
+        for it in items:
+            # 最终权重 = 类别权重 * 装备自身权重
+            w = max(1, int(cat_weight)) * max(1, int(getattr(it, "weight", 1)))
+            pool.extend([it] * w)
+
+    # 池为空则返回空
+    if not pool:
+        return []
+
+    chosen = []
+    # 为避免重复，选中后从池中移除该模板的所有出现
+    for _ in range(count):
+        if not pool:
+            break
+        sel = random.choice(pool)
+        chosen.append(_clone_equipment_template(sel))
+        # 从池中移除该模板的所有条目以避免重复抽中同一模板
+        pool = [p for p in pool if p.id != sel.id]
+
+    return chosen
+
+
+def purchase_cheese_ticket(qq: str, choice: int) -> Tuple[bool, str]:
+    """处理芝士券购买并按规则为用户重新配装。
+
+    返回值：(是否成功, 返回给上层显示的消息字符串)
+    """
+    user = users.get(qq)
+    if not user:
+        user = user_init(qq)
+
+    # cancel
+    if choice == 0:
+        return True, "已取消购买，保持现有装备。"
+
+    cost_map = {1: 50, 2: 200, 3: 1000, 4: 5000}
+    if choice not in cost_map:
+        return False, "你只能在芝士券中选择！"
+
+    cost = cost_map[choice]
+    if user.gold < cost:
+        return False, "金币不足，无法购买芝士券。"
+
+    # 回收当前装备：计算总价值并移除所有装备（并撤销属性）
+    total_recycle = sum(eq.value for eq in user.equipment)
+    # remove all equipment safely
+    for eq in list(user.equipment):
+        user.unequip_item(eq)
+
+    # 将回收价值加入金币
+    user.gold += total_recycle
+
+    # 扣除购买费用
+    user.gold -= cost
+
+    # 根据choice选择添加新装备
+    new_eqs = []
+    if choice == 1:
+        weights = {0: 100, 1: 10, 3: 1}
+        new_eqs = _weighted_draw_equipment(weights, 3)
+    elif choice == 2:
+        weights = {0: 10, 1: 100, 2: 10, 3: 1}
+        new_eqs = _weighted_draw_equipment(weights, 3)
+    elif choice == 3:
+        weights = {1: 20, 2: 40, 3: 10}
+        new_eqs = _weighted_draw_equipment(weights, 3)
+    elif choice == 4:
+        weights = {2: 30, 3: 30}
+        new_eqs = _weighted_draw_equipment(weights, 4)
+
+    added_names = []
+    for eq in new_eqs:
+        user.equip_item(eq)
+        added_names.append(eq.name)
+
+    # 保存用户和物品状态
+    save_user(user)
+    save_user_equipment(user.qq, user.equipment)
+
+    if not new_eqs:
+        return True, f"购买成功，回收了旧装备获得 {total_recycle} 金币，但未抽到新装备。"
+
+    return True, f"购买成功，回收旧装备获得 {total_recycle} 金币；已为你添加装备：{', '.join(added_names)}"
+

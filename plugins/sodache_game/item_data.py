@@ -7,7 +7,7 @@ common_items = [
     Item(id="item_apple", name="苹果", value=15 , quality=0, weight=15),
     Item(id="item_bandage", name="银币", value=10 , quality=0, weight=25),
     Item(id="item_stone", name="跳舞的女郎", value=10 , quality=0, weight=10),
-    Item(id="item_wood", name="香喷喷烤面", value=20 , quality=0, weight=10)
+    Item(id="item_wood", name="香喷喷炒面", value=20 , quality=0, weight=10)
 ]
 
 # 稀有物品列表（quality=1）

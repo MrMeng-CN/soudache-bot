@@ -1,6 +1,6 @@
 import sqlite3
 from typing import Dict, List, Optional
-from .models.game_models import User, Item
+from .models.game_models import User, Item, Equipment
 from .connection_pool import ConnectionPool
 
 db_path = "game_data.db"
@@ -79,6 +79,29 @@ def init_db():
             item_quality INTEGER
         )
         """)
+    
+    # 创建用户装备表
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_equipment (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_qq TEXT,
+        item_id TEXT,
+        item_name TEXT,
+        item_value INTEGER,
+        item_quality INTEGER,
+        equip_attack INTEGER DEFAULT 0,
+        equip_defense INTEGER DEFAULT 0,
+        equip_luck INTEGER DEFAULT 0,
+        extra_search_speed INTEGER DEFAULT 0,
+        extra_retreat_time INTEGER DEFAULT 0,
+        equip_attack_cooldown INTEGER DEFAULT 0,
+        extra_backpack_capacity INTEGER DEFAULT 0,
+        extra_attack_protection_duration INTEGER DEFAULT 0
+    )
+    """)
+    
+    # 为user_qq字段创建索引，提高查询效率
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_equipment_qq ON user_equipment(user_qq)")
     
     conn.commit()
     sqlite_pool.put_conn(conn)  # 将连接放回连接池
@@ -161,6 +184,37 @@ def save_user_items(user_qq: str, items: List[Item], conn: Optional[sqlite3.Conn
         conn.commit()
         sqlite_pool.put_conn(conn)
 
+def save_user_equipment(user_qq: str, equipment: List[Equipment], conn: Optional[sqlite3.Connection] = None):
+    """保存用户装备到数据库"""
+    use_pool = conn is None
+    if use_pool:
+        conn = sqlite_pool.get_conn()
+    
+    cursor = conn.cursor()
+    
+    # 先删除旧的装备记录
+    cursor.execute("DELETE FROM user_equipment WHERE user_qq = ?", (user_qq,))
+    
+    # 插入新的装备记录
+    for eq in equipment:
+        cursor.execute("""
+        INSERT INTO user_equipment (
+            user_qq, item_id, item_name, item_value, item_quality,
+            equip_attack, equip_defense, equip_luck, extra_search_speed,
+            extra_retreat_time, equip_attack_cooldown, extra_backpack_capacity,
+            extra_attack_protection_duration
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            user_qq, eq.id, eq.name, eq.value, eq.quality,
+            eq.equip_attack, eq.equip_defense, eq.equip_luck, eq.extra_search_speed,
+            eq.extra_retreat_time, eq.equip_attack_cooldown, eq.extra_backpack_capacity,
+            eq.extra_attack_protection_duration
+        ))
+    
+    if use_pool:
+        conn.commit()
+        sqlite_pool.put_conn(conn)
+
 def load_user_items(user_qq: str, conn: Optional[sqlite3.Connection] = None) -> List[Item]:
     """从数据库加载用户物品"""
     use_pool = conn is None
@@ -180,19 +234,58 @@ def load_user_items(user_qq: str, conn: Optional[sqlite3.Connection] = None) -> 
     
     return items
 
+def load_user_equipment(user_qq: str, conn: Optional[sqlite3.Connection] = None) -> List[Equipment]:
+    """从数据库加载用户装备"""
+    use_pool = conn is None
+    if use_pool:
+        conn = sqlite_pool.get_conn()
+    
+    cursor = conn.cursor()
+    cursor.execute("""
+    SELECT item_id, item_name, item_value, item_quality, 
+           equip_attack, equip_defense, equip_luck, extra_search_speed,
+           extra_retreat_time, equip_attack_cooldown, extra_backpack_capacity,
+           extra_attack_protection_duration
+    FROM user_equipment WHERE user_qq = ?
+    """, (user_qq,))
+    rows = cursor.fetchall()
+    
+    if use_pool:
+        sqlite_pool.put_conn(conn)
+    
+    equipment = []
+    for row in rows:
+        equipment.append(Equipment(
+            id=row[0],
+            name=row[1],
+            value=row[2],
+            quality=row[3],
+            equip_attack=row[4],
+            equip_defense=row[5],
+            equip_luck=row[6],
+            extra_search_speed=row[7],
+            extra_retreat_time=row[8],
+            equip_attack_cooldown=row[9],
+            extra_backpack_capacity=row[10],
+            extra_attack_protection_duration=row[11]
+        ))
+    
+    return equipment
+
 def save_all(users_dict: Dict[str, User]):
-    """保存所有用户和物品数据到数据库"""
+    """保存所有用户、物品和装备数据到数据库"""
     conn = sqlite3.connect(db_path, timeout=db_timeout)
     try:
         for qq, user in users_dict.items():
             save_user(user, conn=conn)
             save_user_items(qq, user.inventory, conn=conn)
+            save_user_equipment(qq, user.equipment, conn=conn)
         conn.commit()
     finally:
         conn.close()
 
 def load_all() -> Dict[str, User]:
-    """从数据库加载所有用户和物品数据"""
+    """从数据库加载所有用户、物品和装备数据"""
     users_dict = {}
     
     conn = sqlite3.connect(db_path, timeout=db_timeout)
@@ -208,6 +301,11 @@ def load_all() -> Dict[str, User]:
         if user:
             # 加载用户物品到inventory
             user.inventory = load_user_items(qq, conn=conn)
+            # 加载用户装备到equipment
+            equipment_list = load_user_equipment(qq, conn=conn)
+            # 应用装备加成
+            for eq in equipment_list:
+                user.equip_item(eq)
             users_dict[qq] = user
     
     conn.close()
