@@ -203,10 +203,10 @@ def check_retreat_status(qq: str) -> int:
     # 计算撤离开始后经过的时间
     elapsed_time = int(time.time()) - user.retreat_start_time
     # 如果撤离时间超过10分钟（600秒），则认为撤离成功
-    if elapsed_time >= 600:
+    if elapsed_time >= 600-user.speed*30:
         # 计算本次搜索物品的总价值
         total_value = sum(item.value for item in user.inventory)
-        # 将总价值添加到用户金币中
+        # 将总价值添加到用户哈哈币中
         user.gold += total_value
         # 设置用户状态为未搜索
         user.status = 0
@@ -251,26 +251,28 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     if attacker.status != 1:
         return f"你未在搜索状态"
     # 检查是否在攻击冷却时间内
-    if int(time.time()) - attacker.attack_cooldown_start < attacker.attack_cooldown_time:
-        return f"冷却中，{attacker.attack_cooldown_time - int(time.time()) + attacker.attack_cooldown_start}秒后可再次攻击"
-    # 检查防守方是否处于被攻击保护状态
     current_time = int(time.time())
+    if attacker.attack_cooldown_end_time - current_time > 0:
+        return f"冷却中，{attacker.attack_cooldown_end_time - current_time}秒后可再次攻击"
+    # 检查防守方是否处于被攻击保护状态
     if current_time < defender.attack_protection_end_time:
         remaining_time = defender.attack_protection_end_time - current_time
         return f"攻击失败！目标处于被攻击保护中，剩余{remaining_time}秒"
     # 计算攻击成功率：进攻方攻击力 / (进攻方攻击力 + 防守方防御力)
     attack_success_rate = attacker.attack / (attacker.attack + defender.defense)
-    attacker.attack_cooldown_start = int(time.time())
+
+    attacker.attack_cooldown_end_time = current_time
+
     if random.random() >= attack_success_rate:
         # 攻击失败：只计算进攻方的损失
-        # 损失金币 = 防守方攻击力 - 进攻方防御力，最低损失10金币
+        # 损失哈哈币 = 防守方攻击力 - 进攻方防御力，最低损失10哈哈币
         damage = max(10, defender.attack - attacker.defense)*2
         attacker.gold = attacker.gold - damage
-        attacker.attack_cooldown_time = 120
+        attacker.attack_cooldown_end_time +=180
         # 保存进攻方数据到数据库
         save_user(attacker)
         
-        return f"没打过！你损失了{damage}金币"
+        return f"没打过！你损失了{damage}哈哈币"
     
     # 攻击成功
     # 1. 抢夺防守方一件随机物品（从当前搜索物品中）
@@ -286,26 +288,25 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
         defender_user.inventory.remove(stolen_item)
         defender_user.user_bag_items_nums -= 1
 
-    # 2. 计算双方损失金币
-    # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10金币
+    # 2. 计算双方损失哈哈币
+    # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10哈哈币
     attacker_damage = max(10, defender.attack - attacker.defense)
     attacker.gold = attacker.gold - attacker_damage
-    attacker.attack_cooldown_start = int(time.time())
-    attacker.attack_cooldown_time = 600
+    attacker.attack_cooldown_end_time += 360
     
     # 设置被攻击保护时间
-    defender.attack_protection_end_time = int(time.time()) + defender.attack_protection_duration
+    defender.attack_protection_end_time = current_time + defender.attack_protection_duration
     
     # 保存进攻方和防守方的数据及物品到数据库
     save_user(attacker)
     save_user(defender)
     save_user_items(attacker.qq, attacker.inventory)
     save_user_items(defender.qq, defender.inventory)
-    defender.search_start_time = int(time.time())
+    defender.search_start_time = current_time
 
     if stolen_item is None:
-        return f"打赢了！你损失了{attacker_damage}金币，但是没有抢夺到物品!"
-    return f"打赢了！你损失了{attacker_damage}金币，抢夺到了{stolen_item.name}!"
+        return f"打赢了！你损失了{attacker_damage}哈哈币，但是没有抢夺到物品!"
+    return f"打赢了！你损失了{attacker_damage}哈哈币，抢夺到了{stolen_item.name}!"
 
 
 def stop_retreat(qq: str) -> bool:
@@ -331,7 +332,7 @@ def stop_retreat(qq: str) -> bool:
     save_user(user)
     return True
 
-def upgrade_attribute(qq: str, attribute_tag: int, amount: int) -> bool:
+def upgrade_attribute(qq: str, attribute_tag: int, amount: int) -> tuple[bool,str]:
     """
     升级属性函数
     :param qq: 用户QQ号
@@ -345,25 +346,38 @@ def upgrade_attribute(qq: str, attribute_tag: int, amount: int) -> bool:
         user = user_init(qq)
     
     if attribute_tag == 1:
-        cost = amount * 50
+        cost = amount * 500
         if user.gold < cost:
-            return False
+            return False,f"哈哈币不足"
         user.gold -= cost
         user.attack += amount
     elif attribute_tag == 2:
-        cost = amount * 50
+        cost = amount * 500
         if user.gold < cost:
-            return False
+            return False,f"哈哈币不足"
         user.gold -= cost
         user.defense += amount
     elif attribute_tag == 3:
-        cost = amount * 200
+        cost = amount * 2000
         if user.gold < cost:
-            return False
+            return False,f"哈哈币不足"
+        # 每级加快30秒撤离速度
+        if user.speed+amount>10:
+            return False,f"速度已经提升到最高了"
         user.gold -= cost
         user.speed += amount
+    elif attribute_tag == 4:
+        # 初始容量为4，计算当前升级的等级
+        current_level = user.backpack_capacity - 4
+        # 价格按比例上升：5000 * (current_level + 1)
+        cost = 4000 * (current_level + 1)
+        if user.gold < cost:
+            return False,f"哈哈币不足"
+        user.gold -= cost
+        user.backpack_capacity += 1
     else:
-        return False
+        return False,f"输入错误，没有你要升级的属性"
+
     # 保存用户数据到数据库
     save_user(user)
-    return True
+    return True,f"升级成功"

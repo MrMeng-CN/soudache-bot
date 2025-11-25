@@ -18,8 +18,8 @@ class User:
     attack: int = 10             # 攻击力
     defense: int = 5             # 防御力
     luck: int = 0                # 幸运值
-    speed: int = 0               # 搜索速度
-    gold: int = 100              # 金币数量
+    speed: int = 0               # 撤离速度
+    gold: int = 100              # 哈哈币数量
     inventory: List[Item] = field(default_factory=list)  # 背包物品列表
     status: int = 0              #0为未在搜索中，1为在搜索中，2为撤离中
     search_start_time: int = 0   # 搜索开始时间
@@ -28,7 +28,7 @@ class User:
     search_group: str = ""            # 搜索所在群
     user_bag_items_nums: int = 0      # 用户背包物品数量
     have_searched_nums: int = 0       # 本次搜索已搜索物品数量
-    attack_cooldown_time: int = 0     # 攻击冷却时间
+    attack_cooldown_end_time: int = 0     # 攻击冷却时间结束时间
     backpack_capacity: int = 4        # 背包容量
     attack_protection_end_time: int = 0  # 被攻击保护结束时间
     attack_protection_duration: int = 180 # 被攻击保护时长（秒）

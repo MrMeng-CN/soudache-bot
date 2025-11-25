@@ -30,7 +30,7 @@ def init_db():
         search_group TEXT DEFAULT '',
         user_bag_items_nums INTEGER DEFAULT 0,
         have_searched_nums INTEGER DEFAULT 0,
-        attack_cooldown_time INTEGER DEFAULT 0,
+        attack_cooldown_end_time INTEGER DEFAULT 0,
         backpack_capacity INTEGER DEFAULT 4,
         attack_protection_end_time INTEGER DEFAULT 0
     )
@@ -93,12 +93,12 @@ def save_user(user: User, conn: Optional[sqlite3.Connection] = None):
     cursor.execute("""
     INSERT OR REPLACE INTO users (
         qq, attack, defense, luck, speed, gold, status, search_start_time,
-        attack_cooldown_start, retreat_start_time, search_group, user_bag_items_nums, have_searched_nums, attack_cooldown_time, backpack_capacity, attack_protection_end_time
+        attack_cooldown_start, retreat_start_time, search_group, user_bag_items_nums, have_searched_nums, attack_cooldown_end_time, backpack_capacity, attack_protection_end_time
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         user.qq, user.attack, user.defense, user.luck, user.speed, user.gold, user.status,
         user.search_start_time, user.attack_cooldown_start, user.retreat_start_time, user.search_group,
-        user.user_bag_items_nums, user.have_searched_nums, user.attack_cooldown_time, user.backpack_capacity, user.attack_protection_end_time
+        user.user_bag_items_nums, user.have_searched_nums, user.attack_cooldown_end_time, user.backpack_capacity, user.attack_protection_end_time
     ))
     
     if use_pool:
@@ -128,12 +128,18 @@ def load_user(qq: str, conn: Optional[sqlite3.Connection] = None) -> User:
             gold=row[5],
             status=row[6],
             search_start_time=row[7],
+
+            # 已弃用
             attack_cooldown_start=row[8],
+
             retreat_start_time=row[9],
             search_group=row[10],
             user_bag_items_nums=row[11],
+            
+            # 已弃用
             have_searched_nums=row[12],
-            attack_cooldown_time=row[13],
+
+            attack_cooldown_end_time=row[13],
             backpack_capacity=row[14],
             attack_protection_end_time=row[15]
         )
