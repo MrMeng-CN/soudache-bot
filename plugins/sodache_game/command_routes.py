@@ -14,7 +14,7 @@ from nonebot.params import ArgPlainText
 from nonebot.rule import Rule
 import time
 from .models.game_models import EquipmentType
-from .db import save_user
+from .db import save_user, save_user_equipment_storage
 
 quality_map = {0: "普通", 1: "稀有", 2: "史诗", 3: "传说"}
 equipment_type_map = {0: "武器", 1: "防具", 2: "背包", 3: "饰品", 99: "其他"}
@@ -219,6 +219,7 @@ async def _handle_equipment_store_or_sell(event: Event, store_or_sell: str = Arg
     if store_or_sell == "1":
         user.equipment_storage.append(new_eq)
         save_user(user)
+        save_user_equipment_storage(qq, user.equipment_storage)
         await equip_start_cmd.finish(msg+f"已存入装备仓库（当前{len(user.equipment_storage)}/10）！")
     elif store_or_sell == "2":
         user.gold += new_eq.value
@@ -283,6 +284,7 @@ async def _peizhuang_action(event: Event, action: str = ArgPlainText()):
         user.gold += eq.value
         user.equipment_storage.pop(idx)
         save_user(user)
+        save_user_equipment_storage(qq, user.equipment_storage)
         await peizhuang_cmd.finish(msg + f"已出售{eq.name}，获得{eq.value}哈哈币。\n当前哈哈币：{user.gold}")
     elif action == "1":
         # 装备
@@ -293,6 +295,7 @@ async def _peizhuang_action(event: Event, action: str = ArgPlainText()):
             user.equipment.append(eq)
             user.equipment_storage.pop(idx)
             save_user(user)
+            save_user_equipment_storage(qq, user.equipment_storage)
             await peizhuang_cmd.finish(msg + f"已装备{eq.name}！\n当前装备数：{len(user.equipment)}/4")
         else:
             # 已装备4件，需替换
@@ -323,6 +326,7 @@ async def _peizhuang_replace(event: Event, replace_idx: str = ArgPlainText()):
         user.gold += eq.value
         user.equipment_storage.pop(to_equip_idx)
         save_user(user)
+        save_user_equipment_storage(qq, user.equipment_storage)
         await peizhuang_cmd.finish(msg + f"已出售{eq.name}，获得{eq.value}哈哈币。\n当前哈哈币：{user.gold}")
     
     # 选项1-4：替换装备
@@ -339,5 +343,6 @@ async def _peizhuang_replace(event: Event, replace_idx: str = ArgPlainText()):
     user.equipment_storage[to_equip_idx] = old_eq
     user.equipment[rep_idx-1] = new_eq
     save_user(user)
+    save_user_equipment_storage(qq, user.equipment_storage)
     await peizhuang_cmd.finish(msg + f"已用{new_eq.name}（{equipment_type_map.get(getattr(new_eq, 'equipment_type', 99), '未知')}）替换{old_eq.name}（{equipment_type_map.get(getattr(old_eq, 'equipment_type', 99), '未知')}）！")
 

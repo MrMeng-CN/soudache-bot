@@ -3,7 +3,7 @@ import random
 from typing import Dict, List, Tuple
 from .models.game_models import User, Item, PlayerStats
 from .item_data import items_by_quality
-from .db import init_db, load_all, save_all, save_user, save_user_items, save_user_equipment
+from .db import init_db, load_all, save_all, save_user, save_user_items, save_user_equipment, save_user_equipment_storage
 from .equipment_data import common_equipment, rare_equipment, epic_equipment, legendary_equipment
 from dataclasses import asdict
 from .models.game_models import Equipment
