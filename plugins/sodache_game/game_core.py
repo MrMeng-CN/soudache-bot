@@ -1,7 +1,7 @@
 import time
 import random
 from typing import Dict, List, Tuple
-from .models.game_models import User, Item
+from .models.game_models import User, Item, PlayerStats
 from .item_data import items_by_quality
 from .db import init_db, load_all, save_all, save_user, save_user_items, save_user_equipment
 from .equipment_data import common_equipment, rare_equipment, epic_equipment, legendary_equipment
@@ -12,6 +12,69 @@ from .models.game_models import Equipment
 init_db()
 # 从数据库加载所有用户和物品数据
 users = load_all()
+
+def get_player_stats(user: User) -> PlayerStats:
+    """
+    计算玩家的综合属性，包括基础属性和装备加成。
+    :param user: 用户对象
+    :return: 包含综合属性的 PlayerStats 实例
+    """
+    # 初始化基础属性
+    base_attack = float(user.attack)
+    base_defense = float(user.defense)
+    base_luck = float(user.luck)
+    base_search_speed = float(user.search_speed)
+    base_attack_cooldown_time = float(user.attack_cooldown_time)
+    base_backpack_capacity = float(user.backpack_capacity)
+    base_attack_protection_duration = float(user.attack_protection_duration)
+    
+    # 汇总所有装备的加法加成
+    add_attack = 0.0
+    add_defense = 0.0
+    add_luck = 0.0
+    add_search_speed = 0.0
+    add_attack_cooldown_time = 0.0
+    add_backpack_capacity = 0.0
+    add_attack_protection_duration = 0.0
+    add_extra_retreat_time = 0.0
+    
+    # 汇总所有装备的百分比加成
+    increase_attack_percent = 0.0
+    increase_defense_percent = 0.0
+    
+    for eq in user.equipment:
+        # 加法加成
+        add_attack += getattr(eq, "add_to_attack", 0)
+        add_defense += getattr(eq, "add_to_defense", 0)
+        add_luck += getattr(eq, "equip_luck", 0)
+        add_search_speed += getattr(eq, "extra_search_speed", 0)
+        add_attack_cooldown_time += getattr(eq, "equip_attack_cooldown", 0)
+        add_backpack_capacity += getattr(eq, "extra_backpack_capacity", 0)
+        add_attack_protection_duration += getattr(eq, "extra_attack_protection_duration", 0)
+        add_extra_retreat_time += getattr(eq, "extra_retreat_time", 0)
+        
+        # 百分比加成（汇总）
+        increase_attack_percent += getattr(eq, "increase_attack", 0)
+        increase_defense_percent += getattr(eq, "increase_defense", 0)
+    
+    # 计算最终属性：(基础 + 加法) * (1 + 百分比总和 * 0.01)
+    final_attack = (base_attack + add_attack) * (1.0 + increase_attack_percent * 0.01)
+    final_defense = (base_defense + add_defense) * (1.0 + increase_defense_percent * 0.01)
+    
+    # 创建最终属性对象
+    stats = PlayerStats(
+        qq=user.qq,
+        attack=final_attack,
+        defense=final_defense,
+        luck=base_luck + add_luck,
+        speed=base_search_speed + add_search_speed,
+        attack_cooldown_time=base_attack_cooldown_time + add_attack_cooldown_time,
+        backpack_capacity=base_backpack_capacity + add_backpack_capacity,
+        attack_protection_duration=base_attack_protection_duration + add_attack_protection_duration,
+        extra_retreat_time=add_extra_retreat_time,
+    )
+
+    return stats
 
 def user_init(qq: str) -> User:
     """
@@ -113,8 +176,19 @@ def extract_items_by_time(qq: str) -> List[Item]:
     current_time = int(time.time())
     elapsed = current_time - user.search_start_time
     
-    # 每30分钟（1800秒）抽取一件物品
-    items_to_extract = elapsed // 300
+    # 获取包含装备加成的玩家属性
+    stats = get_player_stats(user)
+    # 基础每300秒抽取一件物品，搜索速度影响搜索间隔
+    # 正数减少间隔（加快搜索），负数增加间隔（减慢搜索）
+    # 计算公式：实际搜索间隔 = 300 - search_speed
+    # 最少50秒，最多1800秒（30分钟）
+    base_interval = 300
+    actual_interval = base_interval - stats.search_speed
+    # 限制范围：50秒到1800秒
+    actual_interval = max(50, min(1800, actual_interval))
+    
+    # 每actual_interval秒抽取一件物品
+    items_to_extract = elapsed // actual_interval
     if items_to_extract <= 0:
         return user.inventory
     
@@ -164,6 +238,10 @@ def extract_items_by_time(qq: str) -> List[Item]:
             user.search_start_time = int(time.time())
             break
     
+    # 更新搜索开始时间，减去已消耗的时间（保留未满一个间隔的剩余时间）
+    remaining_time = elapsed % actual_interval
+    user.search_start_time = current_time - remaining_time
+    
     # 保存用户数据和物品到数据库
     save_user(user)
     save_user_items(user.qq, user.inventory)
@@ -191,6 +269,20 @@ def retreat(qq: str) -> bool:
     save_user(user)
     return True
 
+def get_actual_retreat_time(user: User) -> int:
+    """
+    获取用户实际需要的撤退时间（包含装备加成）
+    :param user: 用户对象
+    :return: 实际撤退时间（秒）
+    """
+    stats = get_player_stats(user)
+    # 基础撤退时间600秒 + 装备额外撤退时间（可正可负）
+    # 注意：extra_retreat_time为负数时会减少撤退时间，正数时增加撤退时间
+    # 最少60秒，最多1800秒
+    base_retreat_time = 600
+    actual_retreat_time = base_retreat_time + stats.extra_retreat_time
+    return int(max(60, min(1800, actual_retreat_time)))
+
 def check_retreat_status(qq: str) -> int:
     """
     检查用户撤离状态
@@ -205,11 +297,14 @@ def check_retreat_status(qq: str) -> int:
         return -1
     # 计算撤离开始后经过的时间
     elapsed_time = int(time.time()) - user.retreat_start_time
-    # 如果撤离时间超过10分钟（600秒），则认为撤离成功
-    if elapsed_time >= 600:
+    # 获取实际撤退时间（包含装备加成）
+    actual_retreat_time = get_actual_retreat_time(user)
+    
+    # 如果撤离时间达到要求，则认为撤离成功
+    if elapsed_time >= actual_retreat_time:
         # 计算本次搜索物品的总价值
         total_value = sum(item.value for item in user.inventory)
-        # 将总价值添加到用户金币中
+        # 将总价值添加到用户哈哈币中
         user.gold += total_value
         # 设置用户状态为未搜索
         user.status = 0
@@ -243,6 +338,10 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     extract_items_by_time(attacker_qq)
     if not defender:
         return f"目标不存在"
+    
+    attacker_stats = get_player_stats(attacker)
+    defender_stats = get_player_stats(defender)
+
     if attacker.gold < 0:
         return f"你已经破产了，不要再攻击别人了"
     # 检查防守方是否处于搜索状态（只有搜索中才能被攻击）
@@ -254,99 +353,63 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     if attacker.status != 1:
         return f"你未在搜索状态"
     # 检查是否在攻击冷却时间内
-    if int(time.time()) - attacker.attack_cooldown_start < attacker.attack_cooldown_time:
-        return f"冷却中，{attacker.attack_cooldown_time - int(time.time()) + attacker.attack_cooldown_start}秒后可再次攻击"
+    if int(time.time()) - attacker.attack_cooldown_start < attacker_stats.attack_cooldown_time:
+        return f"冷却中，{attacker_stats.attack_cooldown_time - int(time.time()) + attacker.attack_cooldown_start}秒后可再次攻击"
     # 检查防守方是否处于被攻击保护状态
     current_time = int(time.time())
     if current_time < defender.attack_protection_end_time:
         remaining_time = defender.attack_protection_end_time - current_time
         return f"攻击失败！目标处于被攻击保护中，剩余{remaining_time}秒"
-    # 记录攻击开始前进攻方是否佩戴任何装备（用于结算后可能增加额外冷却）
-    attacker_had_no_equipment = not bool(attacker.equipment)
     # 计算攻击成功率：进攻方攻击力 / (进攻方攻击力 + 防守方防御力 + 1/4 * 防守方攻击力)
-    attack_success_rate = attacker.attack / (attacker.attack + defender.defense + 0.25 * defender.attack)
+    attack_success_rate = attacker_stats.attack / (attacker_stats.attack + defender_stats.defense + 0.25 * defender_stats.attack)
+    
+    # 设置攻击冷却开始时间
     attacker.attack_cooldown_start = int(time.time())
+    
     if random.random() >= attack_success_rate:
-
-        # 攻击失败：不再损失金币，改为 50% 概率被抢走一件已装备的装备
-        attacker.attack_cooldown_time += 120
-        # 若攻击发起前未佩戴装备，则在本次结算后额外增加冷却
-        if attacker_had_no_equipment:
-            attacker.attack_cooldown_time += 360
-        lost_equipment = None
-        # 使用模块级的 random，使代码更易读；同时使用已有的 defender 变量
-        if attacker.equipment and random.random() < 0.5:
-            # 随机选一件装备并移除（unequip_item 会撤销属性）
-            lost_equipment = random.choice(list(attacker.equipment))
-            attacker.unequip_item(lost_equipment)
-            # 将该装备以 Item 形式放入防守方的 inventory
-            stolen_as_item = Item(id=lost_equipment.id, name=lost_equipment.name, value=lost_equipment.value, quality=lost_equipment.quality, weight=lost_equipment.weight)
-            defender.inventory.append(stolen_as_item)
-            defender.user_bag_items_nums += 1
-            # 保存双方数据到数据库
-            save_user(attacker)
-            save_user(defender)
-            save_user_items(defender.qq, defender.inventory)
-            # 更新攻击者状态
-            save_user_equipment(attacker.qq, attacker.equipment)
-            return f"没打过！你被夺走了装备：{lost_equipment.name}，已放入对方背包！"
-        # 未丢失装备的情况
+        # 攻击失败：冷却时间2分钟（120秒）+ 装备加成
+        base_cooldown = 120
+        
+        # 设置冷却时间 = 基础冷却 + 装备的冷却时间加成
+        attacker.attack_cooldown_time = base_cooldown + int(attacker_stats.attack_cooldown_time)
+        
+        # 保存攻击者状态
         save_user(attacker)
-        save_user_equipment(attacker.qq, attacker.equipment)
-        return f"没打过！未损失装备或金币。"
+        return f"没打过！未损失任何物品。"
     
 
     # 攻击成功
-    # 1. 抢夺防守方一件随机物品（从当前搜索物品和已装备物品中）
+    # 抢夺防守方背包中的一件随机物品（只影响 inventory，不影响 equipment）
     stolened_item = []
-    if defender:
-        # 抢夺池包含防守方的背包物品和已装备的装备，装备会被脱下并作为 Item 放入进攻方背包
-        steal_pool = []
-        # 背包物品（Item）
-        steal_pool.extend(list(defender.inventory))
-        if steal_pool:
-            stolen_candidate = random.choice(steal_pool)
-            defender.inventory.remove(stolen_candidate)
-            defender.user_bag_items_nums -= 1
-            attacker.inventory.append(stolen_candidate)
-            attacker.user_bag_items_nums += 1
-            stolened_item.append(stolen_candidate)
-        
-        # 装备物品（Equipment） 
-        if defender.equipment!=[]:
-            stolen_eq = random.choice(list(defender.equipment))
-            defender.unequip_item(stolen_eq)
-            stolened_eq = Equipment(id=stolen_eq.id, name=stolen_eq.name, value=stolen_eq.value, quality=stolen_eq.quality, weight=stolen_eq.weight)
-            attacker.inventory.append(stolened_eq)
-            attacker.user_bag_items_nums += 1
-            stolened_item.append(stolened_eq)
+    if defender and defender.inventory:
+        # 从防守方的背包物品中随机选择一件
+        stolen_candidate = random.choice(defender.inventory)
+        defender.inventory.remove(stolen_candidate)
+        defender.user_bag_items_nums -= 1
+        attacker.inventory.append(stolen_candidate)
+        attacker.user_bag_items_nums += 1
+        stolened_item.append(stolen_candidate)
     
-    # # 2. 计算双方损失金币
-    # # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10金币
-    # attacker_damage = max(10, defender.attack - attacker.defense)
-    # attacker.gold = attacker.gold - attacker_damage
-
-    attacker.attack_cooldown_start = int(time.time())
-    attacker.attack_cooldown_time += 600
-    # 若攻击发起前未佩戴装备，则在本次结算后额外增加冷却
-    if attacker_had_no_equipment:
-        attacker.attack_cooldown_time += 360
+    # 攻击成功：冷却时间10分钟（600秒）+ 装备加成
+    base_cooldown = 600
+    
+    # 设置冷却时间 = 基础冷却 + 装备的冷却时间加成
+    attacker.attack_cooldown_time = base_cooldown + int(attacker_stats.attack_cooldown_time)
     
     # 设置被攻击保护时间
-    defender.attack_protection_end_time = int(time.time()) + defender.attack_protection_duration
+    defender.attack_protection_end_time = int(time.time()) + defender_stats.attack_protection_duration
     
     # 保存进攻方和防守方的数据及物品到数据库
     save_user(attacker)
     save_user(defender)
     save_user_items(attacker.qq, attacker.inventory)
     save_user_items(defender.qq, defender.inventory)
-    save_user_equipment(defender.qq, defender.equipment)
     defender.search_start_time = int(time.time())
 
-    if stolened_item is None:
-        return f"打赢了！但是没有抢夺到物品!"
+    if not stolened_item:
+        return f"打赢了！但对方背包是空的，没有抢夺到物品！"
     else:
-        msg ="打赢了！抢夺到以下物品:"
+        msg = "打赢了！抢夺到以下物品:"
         for st in stolened_item:
             msg += f"\n{st.name}"
         return msg
@@ -417,109 +480,76 @@ def _clone_equipment_template(eq_template: Equipment) -> Equipment:
     return Equipment(**asdict(eq_template))
 
 
-def _weighted_draw_equipment(category_weights: dict, count: int) -> List[Equipment]:
-    """按类别权重抽取若干装备。
-
+def format_equipment_attributes(eq: Equipment) -> str:
+    """格式化装备的非默认值属性。
+    
     参数:
-      - category_weights: dict，键为品质（0/1/2/3），值为该类别的权重。
-      - count: 要抽取的装备数量。
-
-    抽取逻辑：对每个类别中的每件装备，以 `类别权重 * 装备.weight` 作为其最终权重构建抽取池，
-    然后从池中随机选择（不重复），并返回克隆后的 `Equipment` 实例列表。
-    若池为空则返回空列表。
+      - eq: 装备对象
+    
+    返回:
+      - 格式化的属性字符串
     """
-    pool = []
-    categories = {
-        0: common_equipment,
-        1: rare_equipment,
-        2: epic_equipment,
-        3: legendary_equipment,
-    }
-    for q, cat_weight in category_weights.items():
-        items = categories.get(q, [])
-        if not items or cat_weight <= 0:
-            continue
-        for it in items:
-            # 最终权重 = 类别权重 * 装备自身权重
-            w = max(1, int(cat_weight)) * max(1, int(getattr(it, "weight", 1)))
-            pool.extend([it] * w)
-
-    # 池为空则返回空
-    if not pool:
-        return []
-
-    chosen = []
-    # 为避免重复，选中后从池中移除该模板的所有出现
-    for _ in range(count):
-        if not pool:
-            break
-        sel = random.choice(pool)
-        chosen.append(_clone_equipment_template(sel))
-        # 从池中移除该模板的所有条目以避免重复抽中同一模板
-        pool = [p for p in pool if p.id != sel.id]
-
-    return chosen
+    attrs = []
+    
+    # 检查各个属性，只显示非默认值
+    if getattr(eq, 'add_to_attack', 0) != 0:
+        attrs.append(f"攻击力增加 {eq.add_to_attack}")
+    if getattr(eq, 'increase_attack', 0) != 0:
+        attrs.append(f"攻击力提高 {eq.increase_attack}%")
+    if getattr(eq, 'add_to_defense', 0) != 0:
+        attrs.append(f"防御力增加 {eq.add_to_defense}")
+    if getattr(eq, 'increase_defense', 0) != 0:
+        attrs.append(f"防御力提高 {eq.increase_defense}%")
+    if getattr(eq, 'equip_luck', 0) != 0:
+        attrs.append(f"幸运值 {eq.equip_luck:+d}")
+    if getattr(eq, 'extra_search_speed', 0) != 0:
+        attrs.append(f"搜索速度 {eq.extra_search_speed:+d}")
+    if getattr(eq, 'extra_retreat_time', 0) != 0:
+        attrs.append(f"撤退时间 {eq.extra_retreat_time:+d}秒")
+    if getattr(eq, 'equip_attack_cooldown', 0) != 0:
+        value = eq.equip_attack_cooldown
+        attrs.append(f"攻击冷却 {value:+d}秒")
+    if getattr(eq, 'extra_backpack_capacity', 0) != 0:
+        attrs.append(f"背包容量 {eq.extra_backpack_capacity:+d}")
+    if getattr(eq, 'extra_attack_protection_duration', 0) != 0:
+        attrs.append(f"被攻击保护时长 {eq.extra_attack_protection_duration:+d}秒")
+    
+    if not attrs:
+        return "无特殊属性"
+    
+    return "\n".join(attrs)
 
 
-def purchase_cheese_ticket(qq: str, choice: int) -> Tuple[bool, str]:
-    """处理芝士券购买并按规则为用户重新配装。
+def draw_equipment_from_all_pool() -> Equipment:
+    """从全装备奖池中抽取一件装备，type有额外权重。"""
+    from .equipment_data import all_equipment
+    type_weight_map = {0: 100, 1: 100, 2: 10}  # 武器100，防具100，背包10，其它默认1
+    weighted_pool = []
+    for eq in all_equipment:
+        base = max(1, int(getattr(eq, "weight", 1)))
+        type_w = type_weight_map.get(getattr(eq, "equipment_type", 99), 1)
+        weighted_pool.extend([eq] * (base * type_w))
+    if not weighted_pool:
+        return None
+    selected = random.choice(weighted_pool)
+    return _clone_equipment_template(selected)
 
-    返回值：(是否成功, 返回给上层显示的消息字符串)
-    """
+
+def draw_equipment_for_purchase(qq: str) -> Tuple[bool, str, Equipment]:
+    """抽奖消耗300哈哈币，从全type奖池抽取装备。"""
     user = users.get(qq)
     if not user:
         user = user_init(qq)
-
-    # cancel
-    if choice == 0:
-        return True, "已取消购买，保持现有装备。"
-
-    cost_map = {1: 50, 2: 200, 3: 1000, 4: 5000}
-    if choice not in cost_map:
-        return False, "你只能在芝士券中选择！"
-
-    cost = cost_map[choice]
+    cost = 300
     if user.gold < cost:
-        return False, "金币不足，无法购买芝士券。"
+        return False, f"哈哈币不足，无法抽奖！当前哈哈币：{user.gold}，需要：{cost}", None
+    new_eq = draw_equipment_from_all_pool()
+    if not new_eq:
+        return False, "奖池为空，无法抽取！", None
+    from .game_core import format_equipment_attributes
+    attr_str = format_equipment_attributes(new_eq)
+    msg = f"抽到装备：{new_eq.name}\n{attr_str}\n价值：{new_eq.value}哈哈币"
+    return True, msg, new_eq
 
-    # 回收当前装备：计算总价值并移除所有装备（并撤销属性）
-    total_recycle = sum(eq.value for eq in user.equipment)
-    # remove all equipment safely
-    for eq in list(user.equipment):
-        user.unequip_item(eq)
 
-    # 将回收价值加入金币
-    user.gold += total_recycle
-
-    # 扣除购买费用
-    user.gold -= cost
-
-    # 根据choice选择添加新装备
-    new_eqs = []
-    if choice == 1:
-        weights = {0: 100, 1: 10, 3: 1}
-        new_eqs = _weighted_draw_equipment(weights, 3)
-    elif choice == 2:
-        weights = {0: 10, 1: 100, 2: 10, 3: 1}
-        new_eqs = _weighted_draw_equipment(weights, 3)
-    elif choice == 3:
-        weights = {1: 20, 2: 40, 3: 10}
-        new_eqs = _weighted_draw_equipment(weights, 3)
-    elif choice == 4:
-        weights = {2: 30, 3: 30}
-        new_eqs = _weighted_draw_equipment(weights, 4)
-
-    added_names = []
-    for eq in new_eqs:
-        user.equip_item(eq)
-        added_names.append(eq.name)
-
-    # 保存用户和物品状态
-    save_user(user)
-    save_user_equipment(user.qq, user.equipment)
-
-    if not new_eqs:
-        return True, f"购买成功，回收了旧装备获得 {total_recycle} 金币，但未抽到新装备。"
-
-    return True, f"购买成功，回收旧装备获得 {total_recycle} 金币；已为你添加装备：{', '.join(added_names)}"
 

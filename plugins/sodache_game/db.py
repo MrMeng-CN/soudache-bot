@@ -22,6 +22,7 @@ def init_db():
         defense INTEGER DEFAULT 5,
         luck INTEGER DEFAULT 0,
         speed INTEGER DEFAULT 0,
+        search_speed INTEGER DEFAULT 0,
         gold INTEGER DEFAULT 100,
         status INTEGER DEFAULT 0,
         search_start_time INTEGER DEFAULT 0,
@@ -115,11 +116,11 @@ def save_user(user: User, conn: Optional[sqlite3.Connection] = None):
     cursor = conn.cursor()
     cursor.execute("""
     INSERT OR REPLACE INTO users (
-        qq, attack, defense, luck, speed, gold, status, search_start_time,
+        qq, attack, defense, luck, speed, search_speed, gold, status, search_start_time,
         attack_cooldown_start, retreat_start_time, search_group, user_bag_items_nums, have_searched_nums, attack_cooldown_time, backpack_capacity, attack_protection_end_time
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        user.qq, user.attack, user.defense, user.luck, user.speed, user.gold, user.status,
+        user.qq, user.attack, user.defense, user.luck, user.speed, user.search_speed, user.gold, user.status,
         user.search_start_time, user.attack_cooldown_start, user.retreat_start_time, user.search_group,
         user.user_bag_items_nums, user.have_searched_nums, user.attack_cooldown_time, user.backpack_capacity, user.attack_protection_end_time
     ))
@@ -148,17 +149,18 @@ def load_user(qq: str, conn: Optional[sqlite3.Connection] = None) -> User:
             defense=row[2],
             luck=row[3],
             speed=row[4],
-            gold=row[5],
-            status=row[6],
-            search_start_time=row[7],
-            attack_cooldown_start=row[8],
-            retreat_start_time=row[9],
-            search_group=row[10],
-            user_bag_items_nums=row[11],
-            have_searched_nums=row[12],
-            attack_cooldown_time=row[13],
-            backpack_capacity=row[14],
-            attack_protection_end_time=row[15]
+            search_speed=row[5],
+            gold=row[6],
+            status=row[7],
+            search_start_time=row[8],
+            attack_cooldown_start=row[9],
+            retreat_start_time=row[10],
+            search_group=row[11],
+            user_bag_items_nums=row[12],
+            have_searched_nums=row[13],
+            attack_cooldown_time=row[14],
+            backpack_capacity=row[15],
+            attack_protection_end_time=row[16]
         )
     return None
 

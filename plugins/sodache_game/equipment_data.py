@@ -1,49 +1,300 @@
-from .models.game_models import Equipment
+from .models.game_models import Equipment, EquipmentType
+from typing import Dict, List
 
-# 普通装备（quality=0）
-common_equipment = [
-    Equipment(id="eq_havvk_armor", name="哈夫克小兵甲", value=15, quality=0, equip_defense=8, weight=20),
-    Equipment(id="eq_asara_armor", name="阿萨拉小兵甲", value=10, quality=0, equip_defense=7, weight=30),
-    Equipment(id="eq_uz_smg", name="乌兹冲锋枪", value=15, quality=0, equip_attack=7, equip_attack_cooldown=-60, weight=20),
-    Equipment(id="eq_bison_smg", name="野牛冲锋枪", value=10, quality=0, equip_attack=6, equip_attack_cooldown=-60, weight=30),
-    Equipment(id="eq_camp_backpack", name="露营背包", value=10, quality=0, extra_backpack_capacity=2, weight=60),
+# ==================== 装备类型常量 ====================
+EQUIPMENT_TYPE_WEAPON = EquipmentType.WEAPON        # 武器
+EQUIPMENT_TYPE_ARMOR = EquipmentType.ARMOR          # 防具
+EQUIPMENT_TYPE_BACKPACK = EquipmentType.BACKPACK    # 背包
+EQUIPMENT_TYPE_ACCESSORY = EquipmentType.ACCESSORY  # 饰品
+EQUIPMENT_TYPE_OTHER = EquipmentType.OTHER          # 其他
+
+# ==================== 武器 (WEAPON) ====================
+weapons: List[Equipment] = [
+    Equipment(
+    id="smg_uzi",
+    name="乌兹冲锋枪",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=5,
+    increase_attack=15,
+    equip_attack_cooldown=-30,
+    weight=100
+),
+
+    Equipment(
+    id="smg_bison",
+    name="野牛冲锋枪",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=9,
+    equip_attack_cooldown=-30,
+    weight=100
+),
+
+    Equipment(
+    id="ar_G3",
+    name="G3战斗步枪",
+    value=30,
+    quality=1,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=10,
+    increase_attack=10,
+    weight=60
+),
+
+    Equipment(
+    id="ar_QBZ95",
+    name="95式步枪",
+    value=30,
+    quality=1,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=15,
+    increase_attack=5,
+    weight=60
+),
+
+    Equipment(
+    id="ar_M4A1",
+    name="M4A1步枪",
+    value=100,
+    quality=2,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=15,
+    increase_attack=25,
+    weight=15
+),
+
+    Equipment(
+    id="lmg_pkm",
+    name="pkm轻机枪",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=45,
+    extra_retreat_time=30,
+    equip_attack_cooldown=-30,
+    weight=10
+),
+
+    Equipment(
+    id="ar_m7",
+    name="m7战斗步枪",
+    value=350,
+    quality=3,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=30,
+    increase_attack=30,
+    add_to_defense=5,
+    weight=3
+),
+
+    Equipment(
+    id="sr_m700",
+    name="m700狙击步枪",
+    value=150,
+    quality=2,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=10,
+    increase_attack=55,
+    extra_retreat_time=30,
+    equip_attack_cooldown=180,
+    weight=9
+),
+
+    Equipment(
+    id="sr_awm",
+    name="AWM狙击步枪",
+    value=600,
+    quality=3,
+    equipment_type=EQUIPMENT_TYPE_WEAPON,
+    add_to_attack=20,
+    increase_attack=100,
+    extra_retreat_time=60,
+    equip_attack_cooldown=360
+),
+
 ]
 
-# 稀有装备（quality=1）
-rare_equipment = [
-    Equipment(id="eq_gti_bulletproof_vest", name="GTI防弹背心", value=35, quality=1, equip_defense=12, weight=30),
-    Equipment(id="eq_gti_field_pack", name="GTI野战背包", value=25, quality=1, extra_backpack_capacity=5, weight=60),
-    Equipment(id="eq_g3_rifle", name="G3战斗步枪", value=40, quality=1, equip_attack=12, weight=30),
-    Equipment(id="eq_mp5_smg", name="MP5冲锋枪", value=35, quality=1, equip_attack=9, equip_attack_cooldown=-60, weight=20),
-    Equipment(id="eq_sv98_sniper", name="SV98狙击枪", value=50, quality=1, equip_attack=20, equip_attack_cooldown=60, weight=10),
+# ==================== 防具 (ARMOR) ====================
+armors: List[Equipment] = [
+    Equipment(
+    id="moto_vest",
+    name="摩托背心",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=5,
+    increase_defense=15,
+    weight=100
+),
+
+    Equipment(
+    id="havvk_armor",
+    name="哈哈克保安背心",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=10,
+    weight=100
+),
+
+    Equipment(
+    id="stab_armor",
+    name="简易防刺服",
+    value=30,
+    quality=1,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=12,
+    increase_defense=12,
+    weight=60
+),
+
+    Equipment(
+    id="warrior_armor",
+    name="武士防弹背心",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=20,
+    increase_defense=15,
+    weight=10,
+    extra_attack_protection_duration=30
+),
+
+    Equipment(
+    id="mk2_armor",
+    name="MK2防弹背心",
+    value=100,
+    quality=2,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=25,
+    increase_defense=25,
+    extra_retreat_time=30,
+    equip_attack_cooldown=30,
+    weight=20,
+    extra_attack_protection_duration=60
+),
+
+    Equipment(
+    id="heavy_armor",
+    name="重型突击背心",
+    value=300,
+    quality=3,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=45,
+    increase_defense=30,
+    extra_search_speed=60,
+    extra_retreat_time=150,
+    equip_attack_cooldown=90,
+    weight=8,
+    extra_attack_protection_duration=90
+),
+
+    Equipment(
+    id="elite_armor",
+    name="精英防弹背心",
+    value=300,
+    quality=3,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=20,
+    increase_defense=30,
+    weight=8,
+    extra_attack_protection_duration=30
+),
+
+    Equipment(
+    id="titan_armor",
+    name="泰坦防弹装甲",
+    value=500,
+    quality=3,
+    equipment_type=EQUIPMENT_TYPE_ARMOR,
+    add_to_defense=100,
+    increase_defense=40,
+    extra_search_speed=120,
+    extra_retreat_time=240,
+    equip_attack_cooldown=150,
+    extra_attack_protection_duration=120,
+    weight=2
+),
 ]
 
-# 史诗装备（quality=2）
-epic_equipment = [
-    Equipment(id="eq_mk2_vest", name="MK2防弹背心", value=95, quality=2, equip_defense=20, extra_attack_protection_duration=60, weight=35),
-    Equipment(id="eq_heavy_assault_vest", name="重型突击背心", value=130, quality=2, equip_defense=25, extra_attack_protection_duration=90, weight=20),
-    Equipment(id="eq_havvk_field_pack", name="哈夫克野战背包", value=100, quality=2, extra_backpack_capacity=8, weight=60),
-    Equipment(id="eq_mp7_smg", name="MP7冲锋枪", value=90, quality=2, equip_attack=16, equip_attack_cooldown=-60, weight=40),
-    Equipment(id="eq_tenglong_rifle", name="腾龙突击步枪", value=100, quality=2, equip_attack=24, equip_attack_cooldown=-30, weight=30),
-    Equipment(id="eq_m700_sniper", name="M700狙击枪", value=150, quality=2, equip_attack=55, equip_attack_cooldown=60, weight=10),
+# ==================== 背包 (BACKPACK) ====================
+backpacks: List[Equipment] = [
+    Equipment(
+    id="camping_backpack",
+    name="露营背包",
+    value=10,
+    equipment_type=EQUIPMENT_TYPE_BACKPACK,
+    extra_backpack_capacity=2,
+    weight=60
+),
+
+    Equipment(
+    id="gti_backpack",
+    name="GTI野战背包",
+    value=50,
+    quality=1,
+    equipment_type=EQUIPMENT_TYPE_BACKPACK,
+    extra_backpack_capacity=3,
+    weight=30
+),
+
+    Equipment(
+    id="havvk_backpack",
+    name="哈哈克野战背包",
+    value=100,
+    quality=2,
+    equipment_type=EQUIPMENT_TYPE_BACKPACK,
+    extra_retreat_time=30,
+    extra_backpack_capacity=4,
+    weight=15
+),
+
+    Equipment(
+    id="heavy_hiking_backpack",
+    name="重型登山包",
+    value=500,
+    quality=3,
+    equipment_type=EQUIPMENT_TYPE_BACKPACK,
+    extra_retreat_time=120,
+    extra_backpack_capacity=7,
+    weight=3
+),
 ]
 
-# 传说装备（quality=3）
-legendary_equipment = [
-    Equipment(id="eq_titan_armor", name="泰坦防弹装甲", value=500, quality=3, equip_defense=65, extra_attack_protection_duration=120, weight=30),
-    Equipment(id="eq_trick_armor", name="特里克防弹装甲", value=500, quality=3, equip_defense=50, extra_attack_protection_duration=150, weight=30),
-    Equipment(id="eq_m7_rifle", name="M7战斗步枪", value=500, quality=3, equip_attack=50, weight=30),
-    Equipment(id="eq_awm_sniper", name="AWM狙击枪", value=700, quality=3, equip_attack=150, equip_attack_cooldown=90, weight=10),
-    Equipment(id="eq_northstar", name="北极星", value=600, quality=3, equip_attack=40, equip_attack_cooldown=-60, weight=20),
+# ==================== 饰品 (ACCESSORY) ====================
+accessories: List[Equipment] = [
+    # 在此添加饰品装备（预留）
 ]
 
-# 所有装备合并列表
-all_equipment = common_equipment + rare_equipment + epic_equipment + legendary_equipment
+# ==================== 其他 (OTHER) ====================
+other_equipment: List[Equipment] = [
+    # 在此添加其他类型装备（预留）
+]
 
-# 按品质分类的装备字典，便于按品质获取
-equipment_by_quality = {
-    0: common_equipment,
-    1: rare_equipment,
-    2: epic_equipment,
-    3: legendary_equipment,
+# ==================== 所有装备合并列表 ====================
+all_equipment = weapons + armors + backpacks + accessories + other_equipment
+
+# ==================== 按装备类型分类的装备字典 ====================
+equipment_by_type: Dict[int, List[Equipment]] = {
+    EQUIPMENT_TYPE_WEAPON: weapons,
+    EQUIPMENT_TYPE_ARMOR: armors,
+    EQUIPMENT_TYPE_BACKPACK: backpacks,
+    EQUIPMENT_TYPE_ACCESSORY: accessories,
+    EQUIPMENT_TYPE_OTHER: other_equipment,
 }
+
+# ==================== 按品质分类的装备字典（动态生成）====================
+def _get_equipment_by_quality() -> Dict[int, List[Equipment]]:
+    """动态生成按品质分类的字典"""
+    result: Dict[int, List[Equipment]] = {
+        0: [],  # 普通
+        1: [],  # 稀有
+        2: [],  # 史诗
+        3: [],  # 传说
+    }
+    
+    for eq in all_equipment:
+        quality = getattr(eq, "quality", 0)
+        if quality in result:
+            result[quality].append(eq)
+    
+    return result
+
+equipment_by_quality: Dict[int, List[Equipment]] = _get_equipment_by_quality()
