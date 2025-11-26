@@ -1,6 +1,6 @@
 # 虚拟环境
 .venv/
-
+venv/
 # 数据库文件
 game_data.db
 
@@ -10,3 +10,6 @@ __pycache__/
 #配置文件
 .env.prod
 pyproject.toml
+
+# napcat
+napcat.sh
