@@ -110,7 +110,7 @@ def extract_items_by_time(qq: str) -> List[Item]:
     current_time = int(time.time())
     elapsed = current_time - user.search_start_time
     
-    # 每30分钟（1800秒）抽取一件物品
+    # 每300秒抽取一件物品
     items_to_extract = elapsed // 300
     if items_to_extract <= 0:
         return user.inventory
@@ -160,6 +160,11 @@ def extract_items_by_time(qq: str) -> List[Item]:
         if user.user_bag_items_nums >= user.backpack_capacity:
             user.search_start_time = int(time.time())
             break
+    
+    # 在抽取完成后，更新搜索时间到最近一次抽取的位置，避免重复抽取
+    # 只有在确实抽取了物品的情况下才更新时间
+    if items_to_extract > 0:
+        user.search_start_time = int(time.time()) - elapsed%300
     
     # 保存用户数据和物品到数据库
     save_user(user)

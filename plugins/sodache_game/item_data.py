@@ -30,13 +30,13 @@ epic_items = [
 
 # 传说物品列表（quality=3）
 legendary_items = [
-    Item(id="item_excalibur", name="军用炮弹", value=1000 , quality=3, weight=30),
-    Item(id="item_holy_armor", name="笔记本电脑", value=1500 , quality=3, weight=15),
-    Item(id="item_philosophers_stone", name="非洲之心", value=5000 , quality=3, weight=1),
-    Item(id="item_dragon_slayer", name="量子存储", value=500 , quality=3, weight=100),
-    Item(id="item_amulet_of_immortality", name="复苏呼吸机", value=3000 , quality=3, weight=5),
-    Item(id="item_holy_armor", name="光盘", value=700 , quality=3, weight=100),
-    Item(id="item_holy_armor", name="劳力士", value=400 , quality=3, weight=100),
+    Item(id="item_excalibur", name="军用炮弹", value=2500 , quality=3, weight=30),
+    Item(id="item_holy_armor", name="笔记本电脑", value=3000 , quality=3, weight=15),
+    Item(id="item_philosophers_stone", name="非洲之心", value=20000 , quality=3, weight=1),
+    Item(id="item_dragon_slayer", name="量子存储", value=1500 , quality=3, weight=100),
+    Item(id="item_amulet_of_immortality", name="复苏呼吸机", value=15000 , quality=3, weight=5),
+    Item(id="item_holy_armor", name="光盘", value=1500 , quality=3, weight=100),
+    Item(id="item_holy_armor", name="劳力士", value=1400 , quality=3, weight=100),
 ]
 
 # 所有物品合并列表，用于搜索时随机获取物品

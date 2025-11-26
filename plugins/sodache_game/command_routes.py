@@ -126,7 +126,7 @@ async def _status_handler(bot: Bot, event: Event):
     msg = MessageSegment.at(qq)+"\n"
     msg += f"当前状态：{status_info['status_text']}\n"
     msg+=f"哈哈币：{status_info['gold']}\n"
-    msg+=f"攻击力：{user.attack},防御力：{user.defense}"
+    msg+=f"攻击力：{user.attack},防御力：{user.defense}\n"
     if(status_info['status']==1):
         msg+=f"（距离获得下一件物品还剩{300-(int(time.time())-user.search_start_time)%300}秒）\n"
     elif(status_info['status']==2):
