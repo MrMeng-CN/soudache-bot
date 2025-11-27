@@ -13,10 +13,9 @@ weapons: List[Equipment] = [
     Equipment(
     id="smg_uzi",
     name="乌兹冲锋枪",
-    value=10,
+    value=1000,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
     add_to_attack=5,
-    increase_attack=15,
     equip_attack_cooldown=-30,
     weight=100
 ),
@@ -24,92 +23,82 @@ weapons: List[Equipment] = [
     Equipment(
     id="smg_bison",
     name="野牛冲锋枪",
-    value=10,
+    value=1000,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
-    add_to_attack=9,
+    increase_attack=15,
     equip_attack_cooldown=-30,
     weight=100
 ),
 
     Equipment(
-    id="ar_G3",
+    id="ar_g3",
     name="G3战斗步枪",
-    value=30,
+    value=2400,
     quality=1,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
     add_to_attack=10,
     increase_attack=10,
-    weight=60
+    weight=100
 ),
 
     Equipment(
-    id="ar_QBZ95",
+    id="ar_qbz95",
     name="95式步枪",
-    value=30,
+    value=2400,
     quality=1,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
-    add_to_attack=15,
-    increase_attack=5,
-    weight=60
+    add_to_attack=5,
+    increase_attack=25,
+    weight=100
 ),
 
     Equipment(
-    id="ar_M4A1",
-    name="M4A1步枪",
-    value=100,
+    id="smg_sr3m",
+    name="SR3M紧凑突击步枪",
+    value=5000,
     quality=2,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
     add_to_attack=15,
-    increase_attack=25,
-    weight=15
+    increase_attack=15,
+    equip_attack_cooldown=-30,
+    weight=100
 ),
 
     Equipment(
     id="lmg_pkm",
     name="pkm轻机枪",
-    value=10,
+    value=5000,
+    quality=2,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
-    add_to_attack=45,
-    extra_retreat_time=30,
+    add_to_attack=25,
+    increase_attack=15,
+    extra_retreat_time=80,
     equip_attack_cooldown=-30,
-    weight=10
+    weight=100
 ),
 
     Equipment(
     id="ar_m7",
     name="m7战斗步枪",
-    value=350,
+    value=8000,
     quality=3,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
     add_to_attack=30,
     increase_attack=30,
     add_to_defense=5,
-    weight=3
+    weight=100
 ),
 
     Equipment(
     id="sr_m700",
     name="m700狙击步枪",
-    value=150,
-    quality=2,
-    equipment_type=EQUIPMENT_TYPE_WEAPON,
-    add_to_attack=10,
-    increase_attack=55,
-    extra_retreat_time=30,
-    equip_attack_cooldown=180,
-    weight=9
-),
-
-    Equipment(
-    id="sr_awm",
-    name="AWM狙击步枪",
-    value=600,
+    value=8000,
     quality=3,
     equipment_type=EQUIPMENT_TYPE_WEAPON,
     add_to_attack=20,
-    increase_attack=100,
-    extra_retreat_time=60,
-    equip_attack_cooldown=360
+    increase_attack=60,
+    equip_attack_cooldown=180,
+    weight=100
 ),
 
 ]
@@ -117,101 +106,82 @@ weapons: List[Equipment] = [
 # ==================== 防具 (ARMOR) ====================
 armors: List[Equipment] = [
     Equipment(
-    id="moto_vest",
-    name="摩托背心",
-    value=10,
-    equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=5,
-    increase_defense=15,
-    weight=100
-),
-
-    Equipment(
     id="havvk_armor",
     name="哈哈克保安背心",
-    value=10,
+    value=1000,
     equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=10,
+    add_to_defense=5,
+    increase_defense=10,
     weight=100
 ),
 
     Equipment(
     id="stab_armor",
     name="简易防刺服",
-    value=30,
+    value=2500,
     quality=1,
     equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=12,
-    increase_defense=12,
-    weight=60
+    add_to_defense=10,
+    increase_defense=10,
+    weight=100
 ),
 
     Equipment(
     id="warrior_armor",
     name="武士防弹背心",
-    value=10,
+    value=3000,
+    quality=2,
     equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=20,
+    add_to_defense=15,
     increase_defense=15,
-    weight=10,
-    extra_attack_protection_duration=30
+    extra_attack_protection_duration=30,
+    weight=100
+    
 ),
 
     Equipment(
     id="mk2_armor",
     name="MK2防弹背心",
-    value=100,
+    value=3000,
     quality=2,
     equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=25,
-    increase_defense=25,
-    extra_retreat_time=30,
-    equip_attack_cooldown=30,
-    weight=20,
-    extra_attack_protection_duration=60
+    add_to_defense=20,
+    increase_defense=20,
+    extra_retreat_time=40,
+    equip_attack_cooldown=40,
+    extra_attack_protection_duration=60,
+    weight=100
+    
 ),
 
     Equipment(
     id="heavy_armor",
     name="重型突击背心",
-    value=300,
+    value=8000,
     quality=3,
     equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=45,
+    add_to_defense=35,
     increase_defense=30,
-    extra_search_speed=60,
-    extra_retreat_time=150,
+    extra_search_time=40,
+    extra_retreat_time=120,
     equip_attack_cooldown=90,
-    weight=8,
-    extra_attack_protection_duration=90
+    extra_attack_protection_duration=90,
+    weight=100
 ),
 
     Equipment(
     id="elite_armor",
     name="精英防弹背心",
-    value=300,
+    value=8000,
     quality=3,
     equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=20,
-    increase_defense=30,
-    weight=8,
-    extra_attack_protection_duration=30
+    add_to_defense=25,
+    increase_defense=20,
+    extra_attack_protection_duration=60,
+    weight=100
+
 ),
 
-    Equipment(
-    id="titan_armor",
-    name="泰坦防弹装甲",
-    value=500,
-    quality=3,
-    equipment_type=EQUIPMENT_TYPE_ARMOR,
-    add_to_defense=100,
-    increase_defense=40,
-    extra_search_speed=120,
-    extra_retreat_time=240,
-    equip_attack_cooldown=150,
-    extra_attack_protection_duration=120,
-    weight=2
-),
 ]
 
 # ==================== 背包 (BACKPACK) ====================
@@ -219,42 +189,43 @@ backpacks: List[Equipment] = [
     Equipment(
     id="camping_backpack",
     name="露营背包",
-    value=10,
+    value=5000,
+    quality=1,
     equipment_type=EQUIPMENT_TYPE_BACKPACK,
     extra_backpack_capacity=2,
-    weight=60
+    weight=100
 ),
 
     Equipment(
     id="gti_backpack",
     name="GTI野战背包",
-    value=50,
-    quality=1,
+    value=8000,
+    quality=2,
     equipment_type=EQUIPMENT_TYPE_BACKPACK,
     extra_backpack_capacity=3,
-    weight=30
+    weight=100
 ),
 
     Equipment(
     id="havvk_backpack",
     name="哈哈克野战背包",
-    value=100,
-    quality=2,
+    value=12000,
+    quality=3,
     equipment_type=EQUIPMENT_TYPE_BACKPACK,
     extra_retreat_time=30,
     extra_backpack_capacity=4,
-    weight=15
+    weight=100
 ),
 
     Equipment(
     id="heavy_hiking_backpack",
     name="重型登山包",
-    value=500,
+    value=30000,
     quality=3,
     equipment_type=EQUIPMENT_TYPE_BACKPACK,
-    extra_retreat_time=120,
+    extra_retreat_time=240,
     extra_backpack_capacity=7,
-    weight=3
+    weight=30
 ),
 ]
 

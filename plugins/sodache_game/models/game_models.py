@@ -11,15 +11,14 @@ class EquipmentType(IntEnum):
     ACCESSORY = 3   # 饰品
     OTHER = 99      # 其他
 
-@dataclass
 class PlayerStats(BaseModel):
     """最终结算属性"""
     qq: str
     attack: float = 10.0
     defense: float = 5.0
     luck: float = 0.0
-    search_speed: float = 0.0
-    attack_cooldown_time: float = 0.0
+    search_time: float = 0.0
+    equip_attack_cooldown: float = 0.0
     backpack_capacity: float = 4.0
     attack_protection_duration: float = 180.0
     extra_retreat_time: float = 0.0
@@ -43,7 +42,7 @@ class User:
     defense: int = 5             # 防御力
     luck: int = 0                # 幸运值
     speed: int = 0               # 速度（保留用于其他用途）
-    search_speed: int = 0        # 搜索速度
+    search_time: int = 0         # 搜索时长
     gold: int = 100              # 哈哈币数量
     inventory: List[Item] = field(default_factory=list)  # 背包物品列表
     equipment: List["Equipment"] = field(default_factory=list)  # 穿戴的装备列表
@@ -107,7 +106,7 @@ class Equipment(Item):
     add_to_defense: int = 0                     # 直接增加防御力
     increase_defense: int = 0                   # 提高防御力百分比
     equip_luck: int = 0                         # 装备提供的幸运值
-    extra_search_speed: int = 0                 # 额外搜索速度
+    extra_search_time: int = 0                  # 额外搜索时间
     extra_retreat_time: int = 0                 # 额外撤退时间（秒）
     equip_attack_cooldown: int = 0              # 装备攻击冷却时间（秒）
     extra_backpack_capacity: int = 0            # 额外背包空间

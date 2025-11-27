@@ -8,13 +8,13 @@
 from nonebot import on_command, on_message, get_driver
 from nonebot.rule import to_me, Rule
 from nonebot.adapters.onebot.v11 import Bot, Event
-from .game_core import search, retreat, attack, user_init, check_status,check_retreat_status,users,stop_retreat, draw_equipment_for_purchase, format_equipment_attributes, get_actual_retreat_time
+from .game_core import search, retreat, attack, user_init, check_status,check_retreat_status,users,stop_retreat, draw_equipment_for_purchase, format_equipment_attributes, get_actual_retreat_time, get_player_stats
 from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.params import ArgPlainText
 from nonebot.rule import Rule
 import time
 from .models.game_models import EquipmentType
-from .db import save_user, save_user_equipment_storage
+from .db import save_user, save_user_equipment, save_user_equipment_storage
 
 quality_map = {0: "普通", 1: "稀有", 2: "史诗", 3: "传说"}
 equipment_type_map = {0: "武器", 1: "防具", 2: "背包", 3: "饰品", 99: "其他"}
@@ -124,12 +124,22 @@ async def _status_handler(bot: Bot, event: Event):
     total_value = check_retreat_status(qq)
     status_info = check_status(qq)
     user = users.get(qq)
+    stats = get_player_stats(user) if user else None
     # 构建回复消息
     msg = MessageSegment.at(qq)+"\n"
     msg += f"当前状态：{status_info['status_text']}\n"
     if(status_info['status']==1):
-        msg+=f"攻击力：{user.attack},防御力：{user.defense}\n"
-        msg+=f"（距离获得下一件物品还剩{300-(int(time.time())-user.search_start_time)%300}秒）\n"
+        msg+=f"攻击力：{int(user.attack)}+{int(stats.attack)-int(user.attack)}，防御力：{int(user.defense)}+{int(stats.defense)-int(user.defense)}\n"
+        # 与抽取逻辑一致的实际间隔：基础300秒，受"搜索时长（search_time）"影响
+        # 搜索时长为正数：增加间隔（减慢），为负数：减少间隔（加快）
+        base_interval = 300
+        actual_interval = base_interval + int(stats.search_time)
+        # 限制范围保持一致：50~1800 秒
+        actual_interval = max(50, min(1800, actual_interval))
+        elapsed = int(time.time()) - user.search_start_time
+        rem = elapsed % actual_interval
+        remaining_time = actual_interval - rem if rem != 0 else actual_interval
+        msg+=f"（距离获得下一件物品还剩{remaining_time}秒）\n"
     elif(status_info['status']==2):
         actual_retreat_time = get_actual_retreat_time(user)
         remaining_time = actual_retreat_time - (int(time.time()) - user.retreat_start_time)
@@ -137,9 +147,10 @@ async def _status_handler(bot: Bot, event: Event):
             msg+=f"本次撤离带出物品价值：{total_value}哈哈币\n"
             msg+=f"撤离成功！\n"
         else:
-            msg+=f"攻击力：{user.attack},防御力：{user.defense}\n"
+            msg+=f"攻击力：{int(user.attack)}+{int(stats.attack)-int(user.attack)}，防御力：{int(user.defense)}+{int(stats.defense)-int(user.defense)}\n"
             msg+=f"（距离撤离完成还剩{remaining_time}秒，总撤退时间：{actual_retreat_time}秒）\n"
     elif(status_info['status']==0):
+        msg+=f"攻击力：{int(user.attack)}+{int(stats.attack)-int(user.attack)}，防御力：{int(user.defense)}+{int(stats.defense)-int(user.defense)}\n"
         msg+=f"哈哈币：{status_info['gold']}"
     if user.status!=0:
         msg += f"背包物品数量：{status_info['bag_items_nums']}/{user.backpack_capacity}\n"
@@ -172,6 +183,7 @@ equip_start_cmd = on_command("起装", rule=is_exact_command("起装"), priority
 @equip_start_cmd.handle()
 async def _equip_start(event: Event):
     qq = event.get_user_id()
+    check_retreat_status(qq)
     user = users.get(qq)
     if not user:
         user = user_init(qq)
@@ -183,7 +195,7 @@ async def _equip_start(event: Event):
         MessageSegment.at(qq) + "\n"
         + "请选择：\n"
         + "0. 我后悔了，不抽了\n"
-        + "1. 在标准装备池中随机抽取一件装备（300哈哈币）"
+        + "1. 在标准装备池中随机抽取一件装备（5000哈哈币）"
     )
     await equip_start_cmd.send(prompt)
 
@@ -201,32 +213,46 @@ async def _handle_equipment_pool_choice(event: Event, selection: str = ArgPlainT
     success, msg, new_eq = draw_equipment_for_purchase(qq)
     if not success or new_eq is None:
         await equip_start_cmd.finish(MessageSegment.at(qq)+"\n"+msg)
-    equip_start_cmd.set_arg("new_equipment", new_eq)
+    
+    # 直接将装备存入仓库
+    user = users.get(qq)
+    user.equipment_storage.append(new_eq)
+    save_user(user)
+    save_user_equipment_storage(qq, user.equipment_storage)
+    
+    # 将装备信息存入 state，NoneBot2 会自动管理
+    from nonebot.matcher import current_matcher
+    matcher = current_matcher.get()
+    matcher.state["new_equipment"] = new_eq
     msg += f"\n\n请选择要进行的操作：\n1. 存入装备仓库\n2. 出售装备，获得{new_eq.value}哈哈币"
-    await equip_start_cmd.reject(MessageSegment.at(qq)+"\n"+msg)
+    await equip_start_cmd.send(MessageSegment.at(qq)+"\n"+msg)
 
 
 # 处理用户确认装备
-
 @equip_start_cmd.got("store_or_sell")
 async def _handle_equipment_store_or_sell(event: Event, store_or_sell: str = ArgPlainText()):
     qq = event.get_user_id()
     user = users.get(qq)
-    new_eq = equip_start_cmd.get_arg("new_equipment")
+    from nonebot.matcher import current_matcher
+    matcher = current_matcher.get()
+    new_eq = matcher.state.get("new_equipment")
     msg = MessageSegment.at(qq)+"\n"
     if not new_eq:
         await equip_start_cmd.finish(msg+"错误：未找到装备信息！")
-    if store_or_sell == "1":
-        user.equipment_storage.append(new_eq)
-        save_user(user)
-        save_user_equipment_storage(qq, user.equipment_storage)
-        await equip_start_cmd.finish(msg+f"已存入装备仓库（当前{len(user.equipment_storage)}/10）！")
-    elif store_or_sell == "2":
+    
+    store_or_sell = store_or_sell.strip()
+    
+    if store_or_sell == "2":
+        # 选择出售：从仓库移除装备并给予哈哈币
+        if new_eq in user.equipment_storage:
+            user.equipment_storage.remove(new_eq)
+            save_user_equipment_storage(qq, user.equipment_storage)
         user.gold += new_eq.value
         save_user(user)
         await equip_start_cmd.finish(msg+f"已出售{new_eq.name}，获得{new_eq.value}哈哈币。\n当前哈哈币：{user.gold}")
     else:
-        await equip_start_cmd.reject(msg+"请输入1存入仓库或2出售！")
+        # 选择1或其他输入：装备已在仓库，只需提示
+        await equip_start_cmd.finish(msg+f"已存入装备仓库（当前{len(user.equipment_storage)}/10）！")
 
 # 配装命令
 peizhuang_cmd = on_command("配装", rule=is_exact_command("配装"), priority=10)
@@ -234,9 +260,14 @@ peizhuang_cmd = on_command("配装", rule=is_exact_command("配装"), priority=1
 @peizhuang_cmd.handle()
 async def _peizhuang_handler(bot: Bot, event: Event):
     qq = event.get_user_id()
+    check_retreat_status(qq)
     user = users.get(qq)
     msg = MessageSegment.at(qq) + "\n"
-    if not user or not user.equipment_storage:
+    if not user:
+        user = user_init(qq)
+    if user.status != 0:
+        await peizhuang_cmd.finish(msg + "你只能在空闲状态下配装！")
+    if not user.equipment_storage:
         msg += "装备仓库为空，可通过抽奖获得装备。"
         await peizhuang_cmd.finish(msg)
     msg += "装备仓库列表：\n"
@@ -245,7 +276,7 @@ async def _peizhuang_handler(bot: Bot, event: Event):
         eq_type = equipment_type_map.get(getattr(eq, 'equipment_type', 99), "未知")
         msg += f"[{idx}] {quality} {eq_type} {eq.name}\n"
     msg += "\n请输入序号选择装备，回复0退出。"
-    await peizhuang_cmd.finish(msg)
+    await peizhuang_cmd.send(msg)
 
 from .game_core import format_equipment_attributes
 
@@ -262,22 +293,26 @@ async def _peizhuang_select(event: Event, select_idx: str = ArgPlainText()):
     if idx == 0:
         await peizhuang_cmd.finish(msg + "已退出配装。")
     if idx < 1 or idx > len(user.equipment_storage):
-        await peizhuang_cmd.reject(msg + "没有的东西，你还想卖？")
+        await peizhuang_cmd.finish(msg + "没有的东西，你还想卖？已退出装备仓库！")
     eq = user.equipment_storage[idx-1]
     # 展示非默认属性
     attr_str = format_equipment_attributes(eq)
     msg += f"已选择{eq.name}：\n{attr_str}\n"
     msg += f"价值：{eq.value}哈哈币\n"
     msg += f"请选择要进行的操作：\n1. 装备当前装备\n2. 出售装备，获得{eq.value}哈哈币"
-    peizhuang_cmd.set_arg("selected_eq_idx", idx-1)
-    await peizhuang_cmd.reject(msg)
+    from nonebot.matcher import current_matcher
+    matcher = current_matcher.get()
+    matcher.state["selected_eq_idx"] = idx-1
+    await peizhuang_cmd.send(msg)
 
 @peizhuang_cmd.got("action")
 async def _peizhuang_action(event: Event, action: str = ArgPlainText()):
     qq = event.get_user_id()
     user = users.get(qq)
     msg = MessageSegment.at(qq) + "\n"
-    idx = peizhuang_cmd.get_arg("selected_eq_idx")
+    from nonebot.matcher import current_matcher
+    matcher = current_matcher.get()
+    idx = matcher.state.get("selected_eq_idx")
     eq = user.equipment_storage[idx]
     if action == "2":
         # 出售
@@ -295,6 +330,7 @@ async def _peizhuang_action(event: Event, action: str = ArgPlainText()):
             user.equipment.append(eq)
             user.equipment_storage.pop(idx)
             save_user(user)
+            save_user_equipment(qq, user.equipment)
             save_user_equipment_storage(qq, user.equipment_storage)
             await peizhuang_cmd.finish(msg + f"已装备{eq.name}！\n当前装备数：{len(user.equipment)}/4")
         else:
@@ -304,9 +340,9 @@ async def _peizhuang_action(event: Event, action: str = ArgPlainText()):
                 quality = quality_map.get(getattr(old_eq, 'quality', 0), "未知")
                 eq_type = equipment_type_map.get(getattr(old_eq, 'equipment_type', 99), "未知")
                 msg += f"[{i}] {quality} {eq_type} {old_eq.name}\n"
-            msg += f"\n请选择要进行的操作：\n1-4. 选择对应装备进行替换\n5. 出售装备，获得{eq.value}哈哈币"
-            peizhuang_cmd.set_arg("to_equip_idx", idx)
-            await peizhuang_cmd.reject(msg)
+            msg += f"\n请选择要进行的操作：\n1-4. 选择对应装备进行替换\n5. 出售装备，获得{eq.value}哈哈币\n6. 取消替换，装备放回仓库"
+            matcher.state["to_equip_idx"] = idx
+            await peizhuang_cmd.send(msg)
     else:
         await peizhuang_cmd.reject(msg + "请输入1装备或2出售！")
 
@@ -315,10 +351,16 @@ async def _peizhuang_replace(event: Event, replace_idx: str = ArgPlainText()):
     qq = event.get_user_id()
     user = users.get(qq)
     msg = MessageSegment.at(qq) + "\n"
-    to_equip_idx = peizhuang_cmd.get_arg("to_equip_idx")
+    from nonebot.matcher import current_matcher
+    matcher = current_matcher.get()
+    to_equip_idx = matcher.state.get("to_equip_idx")
     if not replace_idx.isdigit():
         await peizhuang_cmd.reject(msg + "请输入正确的序号！")
     rep_idx = int(replace_idx)
+    
+    # 选项6：取消替换，装备留在仓库
+    if rep_idx == 6:
+        await peizhuang_cmd.finish(msg + "已取消替换，装备保留在仓库中。")
     
     # 选项5：出售装备
     if rep_idx == 5:
@@ -343,6 +385,8 @@ async def _peizhuang_replace(event: Event, replace_idx: str = ArgPlainText()):
     user.equipment_storage[to_equip_idx] = old_eq
     user.equipment[rep_idx-1] = new_eq
     save_user(user)
+    save_user_equipment(qq, user.equipment)
     save_user_equipment_storage(qq, user.equipment_storage)
     await peizhuang_cmd.finish(msg + f"已用{new_eq.name}（{equipment_type_map.get(getattr(new_eq, 'equipment_type', 99), '未知')}）替换{old_eq.name}（{equipment_type_map.get(getattr(old_eq, 'equipment_type', 99), '未知')}）！")
+
 

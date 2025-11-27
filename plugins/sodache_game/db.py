@@ -22,7 +22,7 @@ def init_db():
         defense INTEGER DEFAULT 5,
         luck INTEGER DEFAULT 0,
         speed INTEGER DEFAULT 0,
-        search_speed INTEGER DEFAULT 0,
+        search_time INTEGER DEFAULT 0,
         gold INTEGER DEFAULT 100,
         status INTEGER DEFAULT 0,
         search_start_time INTEGER DEFAULT 0,
@@ -90,10 +90,13 @@ def init_db():
         item_name TEXT,
         item_value INTEGER,
         item_quality INTEGER,
-        equip_attack INTEGER DEFAULT 0,
-        equip_defense INTEGER DEFAULT 0,
+        equipment_type INTEGER DEFAULT 99,
+        add_to_attack INTEGER DEFAULT 0,
+        add_to_defense INTEGER DEFAULT 0,
+        increase_attack INTEGER DEFAULT 0,
+        increase_defense INTEGER DEFAULT 0,
         equip_luck INTEGER DEFAULT 0,
-        extra_search_speed INTEGER DEFAULT 0,
+        extra_search_time INTEGER DEFAULT 0,
         extra_retreat_time INTEGER DEFAULT 0,
         equip_attack_cooldown INTEGER DEFAULT 0,
         extra_backpack_capacity INTEGER DEFAULT 0,
@@ -116,7 +119,7 @@ def init_db():
         increase_attack INTEGER DEFAULT 0,
         increase_defense INTEGER DEFAULT 0,
         equip_luck INTEGER DEFAULT 0,
-        extra_search_speed INTEGER DEFAULT 0,
+        extra_search_time INTEGER DEFAULT 0,
         extra_retreat_time INTEGER DEFAULT 0,
         equip_attack_cooldown INTEGER DEFAULT 0,
         extra_backpack_capacity INTEGER DEFAULT 0,
@@ -140,11 +143,11 @@ def save_user(user: User, conn: Optional[sqlite3.Connection] = None):
     cursor = conn.cursor()
     cursor.execute("""
     INSERT OR REPLACE INTO users (
-        qq, attack, defense, luck, speed, search_speed, gold, status, search_start_time,
+        qq, attack, defense, luck, speed, search_time, gold, status, search_start_time,
         attack_cooldown_start, retreat_start_time, search_group, user_bag_items_nums, have_searched_nums, attack_cooldown_time, backpack_capacity, attack_protection_end_time
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
-        user.qq, user.attack, user.defense, user.luck, user.speed, user.search_speed, user.gold, user.status,
+        user.qq, user.attack, user.defense, user.luck, user.speed, user.search_time, user.gold, user.status,
         user.search_start_time, user.attack_cooldown_start, user.retreat_start_time, user.search_group,
         user.user_bag_items_nums, user.have_searched_nums, user.attack_cooldown_time, user.backpack_capacity, user.attack_protection_end_time
     ))
@@ -173,7 +176,7 @@ def load_user(qq: str, conn: Optional[sqlite3.Connection] = None) -> User:
             defense=row[2],
             luck=row[3],
             speed=row[4],
-            search_speed=row[5],
+            search_time=row[5],
             gold=row[6],
             status=row[7],
             search_start_time=row[8],
@@ -225,16 +228,18 @@ def save_user_equipment(user_qq: str, equipment: List[Equipment], conn: Optional
     for eq in equipment:
         cursor.execute("""
         INSERT INTO user_equipment (
-            user_qq, item_id, item_name, item_value, item_quality,
-            equip_attack, equip_defense, equip_luck, extra_search_speed,
-            extra_retreat_time, equip_attack_cooldown, extra_backpack_capacity,
-            extra_attack_protection_duration
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            user_qq, item_id, item_name, item_value, item_quality, equipment_type,
+            add_to_attack, add_to_defense, increase_attack, increase_defense,
+            equip_luck, extra_search_time, extra_retreat_time, equip_attack_cooldown,
+            extra_backpack_capacity, extra_attack_protection_duration
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
-            user_qq, eq.id, eq.name, eq.value, eq.quality,
-            eq.equip_attack, eq.equip_defense, eq.equip_luck, eq.extra_search_speed,
-            eq.extra_retreat_time, eq.equip_attack_cooldown, eq.extra_backpack_capacity,
-            eq.extra_attack_protection_duration
+            user_qq, eq.id, eq.name, eq.value, eq.quality, getattr(eq, 'equipment_type', 99),
+            getattr(eq, 'add_to_attack', 0), getattr(eq, 'add_to_defense', 0),
+            getattr(eq, 'increase_attack', 0), getattr(eq, 'increase_defense', 0),
+            getattr(eq, 'equip_luck', 0), getattr(eq, 'extra_search_time', 0),
+            getattr(eq, 'extra_retreat_time', 0), getattr(eq, 'equip_attack_cooldown', 0),
+            getattr(eq, 'extra_backpack_capacity', 0), getattr(eq, 'extra_attack_protection_duration', 0)
         ))
     
     if use_pool:
@@ -277,14 +282,14 @@ def save_user_equipment_storage(user_qq: str, equipment_storage: List[Equipment]
         INSERT INTO user_equipment_storage (
             user_qq, item_id, item_name, item_value, item_quality, equipment_type,
             add_to_attack, add_to_defense, increase_attack, increase_defense,
-            equip_luck, extra_search_speed, extra_retreat_time, equip_attack_cooldown,
+            equip_luck, extra_search_time, extra_retreat_time, equip_attack_cooldown,
             extra_backpack_capacity, extra_attack_protection_duration
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             user_qq, eq.id, eq.name, eq.value, eq.quality, getattr(eq, 'equipment_type', 99),
             getattr(eq, 'add_to_attack', 0), getattr(eq, 'add_to_defense', 0),
             getattr(eq, 'increase_attack', 0), getattr(eq, 'increase_defense', 0),
-            getattr(eq, 'equip_luck', 0), getattr(eq, 'extra_search_speed', 0),
+            getattr(eq, 'equip_luck', 0), getattr(eq, 'extra_search_time', 0),
             getattr(eq, 'extra_retreat_time', 0), getattr(eq, 'equip_attack_cooldown', 0),
             getattr(eq, 'extra_backpack_capacity', 0), getattr(eq, 'extra_attack_protection_duration', 0)
         ))
@@ -301,10 +306,10 @@ def load_user_equipment(user_qq: str, conn: Optional[sqlite3.Connection] = None)
     
     cursor = conn.cursor()
     cursor.execute("""
-    SELECT item_id, item_name, item_value, item_quality, 
-           equip_attack, equip_defense, equip_luck, extra_search_speed,
-           extra_retreat_time, equip_attack_cooldown, extra_backpack_capacity,
-           extra_attack_protection_duration
+    SELECT item_id, item_name, item_value, item_quality, equipment_type,
+           add_to_attack, add_to_defense, increase_attack, increase_defense,
+           equip_luck, extra_search_time, extra_retreat_time, equip_attack_cooldown,
+           extra_backpack_capacity, extra_attack_protection_duration
     FROM user_equipment WHERE user_qq = ?
     """, (user_qq,))
     rows = cursor.fetchall()
@@ -319,14 +324,17 @@ def load_user_equipment(user_qq: str, conn: Optional[sqlite3.Connection] = None)
             name=row[1],
             value=row[2],
             quality=row[3],
-            equip_attack=row[4],
-            equip_defense=row[5],
-            equip_luck=row[6],
-            extra_search_speed=row[7],
-            extra_retreat_time=row[8],
-            equip_attack_cooldown=row[9],
-            extra_backpack_capacity=row[10],
-            extra_attack_protection_duration=row[11]
+            equipment_type=row[4],
+            add_to_attack=row[5],
+            add_to_defense=row[6],
+            increase_attack=row[7],
+            increase_defense=row[8],
+            equip_luck=row[9],
+            extra_search_time=row[10],
+            extra_retreat_time=row[11],
+            equip_attack_cooldown=row[12],
+            extra_backpack_capacity=row[13],
+            extra_attack_protection_duration=row[14]
         ))
     
     return equipment
@@ -341,7 +349,7 @@ def load_user_equipment_storage(user_qq: str, conn: Optional[sqlite3.Connection]
     cursor.execute("""
     SELECT item_id, item_name, item_value, item_quality, equipment_type,
            add_to_attack, add_to_defense, increase_attack, increase_defense,
-           equip_luck, extra_search_speed, extra_retreat_time, equip_attack_cooldown,
+           equip_luck, extra_search_time, extra_retreat_time, equip_attack_cooldown,
            extra_backpack_capacity, extra_attack_protection_duration
     FROM user_equipment_storage WHERE user_qq = ?
     """, (user_qq,))
@@ -363,7 +371,7 @@ def load_user_equipment_storage(user_qq: str, conn: Optional[sqlite3.Connection]
             increase_attack=row[7],
             increase_defense=row[8],
             equip_luck=row[9],
-            extra_search_speed=row[10],
+            extra_search_time=row[10],
             extra_retreat_time=row[11],
             equip_attack_cooldown=row[12],
             extra_backpack_capacity=row[13],
