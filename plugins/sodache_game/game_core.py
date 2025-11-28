@@ -208,7 +208,7 @@ def check_retreat_status(qq: str) -> int:
     # 计算撤离开始后经过的时间
     elapsed_time = int(time.time()) - user.retreat_start_time
     # 如果撤离时间超过10分钟（600秒），则认为撤离成功
-    if elapsed_time >= 600-user.speed*30:
+    if elapsed_time >= 600-user.speed*40:
         # 计算本次搜索物品的总价值
         total_value = sum(item.value for item in user.inventory)
         # 将总价值添加到用户哈哈币中
@@ -367,7 +367,7 @@ def upgrade_attribute(qq: str, attribute_tag: int, amount: int) -> tuple[bool,st
         if user.gold < cost:
             return False,f"哈哈币不足"
         # 每级加快30秒撤离速度
-        if user.speed+amount>10:
+        if user.speed+amount>7:
             return False,f"速度已经提升到最高了"
         user.gold -= cost
         user.speed += amount

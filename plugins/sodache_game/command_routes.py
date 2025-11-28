@@ -99,7 +99,7 @@ async def _retreat_handler(bot: Bot, event: Event):
     msg = MessageSegment.at(qq)+"\n"
     
     if success:
-        msg += f"撤离开始！{600-user.speed*30}秒后完成撤离并结算物品\n"
+        msg += f"撤离开始！{600-user.speed*40}秒后完成撤离并结算物品\n"
         if user.inventory:
             msg += "本次搜索已获取物品："
             for item in user.inventory:
@@ -179,7 +179,7 @@ async def _train_handler(bot: Bot, event: Event):
     msg += "请选择要升级的属性：\n"
     msg += "1. 攻击力 - 每级500哈哈币\n"
     msg += "2. 防御力 - 每级500哈哈币\n"
-    msg += "3. 撤离速度 - 每级2000哈哈币（最高10级）\n"
+    msg += "3. 撤离速度 - 每级2000哈哈币（最高7级）\n"
     
     # 计算背包容量升级价格
     current_level = user.backpack_capacity - 4
