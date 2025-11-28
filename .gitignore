@@ -3,6 +3,7 @@
 venv/
 # 数据库文件
 game_data.db
+game_data_old.db
 
 #pycache
 __pycache__/
@@ -13,3 +14,4 @@ pyproject.toml
 
 # napcat
 napcat.sh
+NapCat.Shell.Windows.OneKey/

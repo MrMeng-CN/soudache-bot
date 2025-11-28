@@ -354,7 +354,7 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     if attacker.status != 1:
         return f"你未在搜索状态"
     # 检查是否在攻击冷却时间内
-     current_time = int(time.time())
+    current_time = int(time.time())
     # attack_cooldown_time 已经包含了上次攻击时的基础冷却 + 装备加成
     elapsed_time = current_time - attacker.attack_cooldown_start
     if elapsed_time < attacker.attack_cooldown_time:
@@ -397,8 +397,8 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
 
     # 2. 计算双方损失哈哈币
     # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10哈哈币
-    attacker_damage = max(10, defender.attack - attacker.defense)
-    attacker.gold = attacker.gold - attacker_damage
+    damage = max(10, defender.attack - attacker.defense)
+    attacker.gold = attacker.gold - damage
     attacker.attack_cooldown_time = 360 + int(attacker_stats.equip_attack_cooldown)
     
     # 设置被攻击保护时间
@@ -413,9 +413,9 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     defender.search_start_time = current_time
 
     if not stolen_item:
-        return f"打赢了！但对方背包是空的，没有抢夺到物品！\n本次战斗成功率为{success_rate_percent:.2f}%"
+        return f"打赢了！你损失了{damage}哈哈币。但对方背包是空的，没有抢夺到物品！\n本次战斗成功率为{success_rate_percent:.2f}%"
     else:
-        msg = "打赢了！抢夺到以下物品:"
+        msg = f"打赢了！你损失了{damage}哈哈币。抢夺到以下物品:"
         for st in stolen_item:
             msg += f"\n{st.name}"
         msg += f"\n本次战斗成功率为{success_rate_percent:.2f}%"

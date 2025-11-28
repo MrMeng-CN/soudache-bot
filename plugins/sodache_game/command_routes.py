@@ -109,7 +109,6 @@ async def _retreat_handler(bot: Bot, event: Event):
             for item in user.inventory:
                 quality_name = quality_map.get(item.quality, "未知")
                 msg += f"\n{item.name} {quality_name} {item.value}哈哈币"
-                msg += f"\n{item.name} {quality_name} {item.value}哈哈币"
         else:
             msg += "暂无新获取物品"
         await retreat_cmd.finish(msg)
@@ -151,7 +150,7 @@ async def _status_handler(bot: Bot, event: Event):
             msg+=f"撤离成功！\n"
         else:
             msg+=f"攻击力：{int(user.attack)}+{int(stats.attack)-int(user.attack)}，防御力：{int(user.defense)}+{int(stats.defense)-int(user.defense)}\n"
-            msg+=f"（距离撤离完成还剩{remaining_time}秒，总撤退时间：{actual_retreat_time}秒）\n"
+            msg+=f"（距离撤离完成还剩{remaining_time}秒，总撤离时间：{actual_retreat_time}秒）\n"
     elif(status_info['status']==0):
         msg+=f"攻击力：{int(user.attack)}+{int(stats.attack)-int(user.attack)}，防御力：{int(user.defense)}+{int(stats.defense)-int(user.defense)}\n"
         msg+=f"哈哈币：{status_info['gold']}"
@@ -161,7 +160,6 @@ async def _status_handler(bot: Bot, event: Event):
             msg += "本次搜索已获取物品："
             for item in user.inventory:
                 quality_name = quality_map.get(item.quality, "未知")
-                msg += f"\n{item.name} {quality_name} {item.value}哈哈币"
                 msg += f"\n{item.name} {quality_name} {item.value}哈哈币"
     
     await status_cmd.finish(msg)

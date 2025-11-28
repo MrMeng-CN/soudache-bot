@@ -144,7 +144,7 @@ def save_user(user: User, conn: Optional[sqlite3.Connection] = None):
     cursor.execute("""
     INSERT OR REPLACE INTO users (
         qq, attack, defense, luck, speed, search_time, gold, status, search_start_time,
-        attack_cooldown_start, retreat_start_time, search_group, user_bag_items_nums, have_searched_nums, attack_cooldown_time, backpack_capacity, attack_protection_end_time
+        attack_cooldown_start, retreat_start_time, search_group, user_bag_items_nums, have_searched_nums, attack_cooldown_end_time, backpack_capacity, attack_protection_end_time
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         user.qq, user.attack, user.defense, user.luck, user.speed, user.search_time, user.gold, user.status,
