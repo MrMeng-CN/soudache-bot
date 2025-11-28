@@ -381,7 +381,7 @@ async def _handle_equipment_pool_choice(event: Event, selection: str = ArgPlainT
     from nonebot.matcher import current_matcher
     matcher = current_matcher.get()
     matcher.state["new_equipment"] = new_eq
-    msg += f"\n\n请选择要进行的操作：\n1. 存入装备仓库\n2. 出售装备，获得{new_eq.value}哈哈币"
+    msg += f"\n\n请选择要进行的操作：\n1. 立刻装备\n2. 出售装备，获得{new_eq.value}哈哈币"
     await equip_start_cmd.send(MessageSegment.at(qq)+"\n"+msg)
 
 

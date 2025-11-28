@@ -356,9 +356,8 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     # 检查是否在攻击冷却时间内
     current_time = int(time.time())
     # attack_cooldown_time 已经包含了上次攻击时的基础冷却 + 装备加成
-    elapsed_time = current_time - attacker.attack_cooldown_start
-    if elapsed_time < attacker.attack_cooldown_time:
-        remaining = attacker.attack_cooldown_time - elapsed_time
+    if current_time < attacker.attack_cooldown_end_time:
+        remaining = attacker.attack_cooldown_end_time - current_time
         return f"冷却中，{remaining}秒后可再次攻击"
     # 检查防守方是否处于被攻击保护状态
     if current_time < defender.attack_protection_end_time:
@@ -368,38 +367,34 @@ def attack(attacker_qq: str, defender_qq: str) -> str:
     attack_success_rate = attacker_stats.attack / (attacker_stats.attack + defender_stats.defense)
     success_rate_percent = attack_success_rate * 100
     
-    # 设置攻击冷却开始时间
-    attacker.attack_cooldown_start = int(time.time())
-
     if random.random() >= attack_success_rate:
         # 攻击失败：只计算进攻方的损失
         # 损失哈哈币 = 防守方攻击力 - 进攻方防御力，最低损失10哈哈币
         damage = max(10, defender.attack - attacker.defense)*2
         attacker.gold = attacker.gold - damage
-        attacker.attack_cooldown_time = 120 + int(attacker_stats.equip_attack_cooldown)
+        attacker.attack_cooldown_end_time = current_time + 120 + int(attacker_stats.equip_attack_cooldown)
         # 保存进攻方数据到数据库
         save_user(attacker)
         return f"没打过！你损失了{damage}哈哈币。\n本次战斗成功率为{success_rate_percent:.2f}%"
 
     # 攻击成功
     # 1. 抢夺防守方一件随机物品（从当前搜索物品中）
-    defender_user = users.get(defender_qq)
     stolen_item = None
-    if defender_user and defender_user.inventory:
-        stolen_item = random.choice(defender_user.inventory)
-        attacker_user = users.get(attacker_qq)
+    if defender and defender.inventory:
+        stolen_item = random.choice(defender.inventory)
+        attacker = users.get(attacker_qq)
         # 将物品添加到进攻方当前搜索物品
-        attacker_user.inventory.append(stolen_item)
-        attacker_user.user_bag_items_nums += 1
+        attacker.inventory.append(stolen_item)
+        attacker.user_bag_items_nums += 1
         # 从防守方当前搜索物品中移除
-        defender_user.inventory.remove(stolen_item)
-        defender_user.user_bag_items_nums -= 1
+        defender.inventory.remove(stolen_item)
+        defender.user_bag_items_nums -= 1   
 
     # 2. 计算双方损失哈哈币
     # 进攻方损失：防守方攻击力 - 进攻方防御力，最低10哈哈币
     damage = max(10, defender.attack - attacker.defense)
     attacker.gold = attacker.gold - damage
-    attacker.attack_cooldown_time = 360 + int(attacker_stats.equip_attack_cooldown)
+    attacker.attack_cooldown_end_time = current_time + 360 + int(attacker_stats.equip_attack_cooldown)
     
     # 设置被攻击保护时间
     defender.attack_protection_end_time = int(time.time()) + defender_stats.attack_protection_duration
