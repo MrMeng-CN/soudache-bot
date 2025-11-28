@@ -8,7 +8,7 @@
 from nonebot import on_command, on_message, get_driver
 from nonebot.rule import to_me, Rule
 from nonebot.adapters.onebot.v11 import Bot, Event
-from .game_core import search, retreat, attack, user_init, check_status,check_retreat_status,users,stop_retreat, upgrade_attribute, draw_equipment_for_purchase, format_equipment_attributes, get_actual_retreat_time, get_player_stats
+from .game_core import search, retreat, attack, user_init, check_status,check_retreat_status,users,stop_retreat,get_actual_retreat_time,upgrade_attribute, draw_equipment_for_purchase, format_equipment_attributes, get_actual_retreat_time, get_player_stats
 from nonebot.adapters.onebot.v11 import MessageSegment
 from nonebot.params import ArgPlainText
 from .db import save_user
@@ -102,9 +102,9 @@ async def _retreat_handler(bot: Bot, event: Event):
     user = users.get(qq)
     success = retreat(qq)
     msg = MessageSegment.at(qq)+"\n"
-    
+    actual_retreat_time = get_actual_retreat_time(user)
     if success:
-        msg += f"撤离开始！{600-user.speed*40}秒后完成撤离并结算物品\n"
+        msg += f"撤离开始！{actual_retreat_time}秒后完成撤离并结算物品\n"
         if user.inventory:
             msg += "本次搜索已获取物品："
             for item in user.inventory:
@@ -133,9 +133,9 @@ async def _status_handler(bot: Bot, event: Event):
     msg += f"当前状态：{status_info['status_text']}\n"
     if(status_info['status']==1):
         msg+=f"攻击力：{int(user.attack)}+{int(stats.attack)-int(user.attack)}，防御力：{int(user.defense)}+{int(stats.defense)-int(user.defense)}\n"
-        # 与抽取逻辑一致的实际间隔：基础300秒，受"搜索时长（search_time）"影响
+        # 与抽取逻辑一致的实际间隔：基础360秒，受"搜索时长（search_time）"影响
         # 搜索时长为正数：增加间隔（减慢），为负数：减少间隔（加快）
-        base_interval = 300
+        base_interval = 360
         actual_interval = base_interval + int(stats.search_time)
         # 限制范围保持一致：50~1800 秒
         actual_interval = max(50, min(1800, actual_interval))
@@ -546,7 +546,7 @@ async def _peizhuang_replace(event: Event, replace_idx: str = ArgPlainText()):
 
 
 # 更新补偿指令：每人限领一次，再触发扣1000
-compensation_cmd = on_message("更新补偿。。。", rule=is_exact_command("更新补偿。。。"), priority=10)
+compensation_cmd = on_command("更新补偿。。。", rule=is_exact_command("更新补偿。。。"), priority=10)
 @compensation_cmd.handle()
 async def _compensation_handler(bot: Bot, event: Event):
     qq = event.get_user_id()

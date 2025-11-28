@@ -280,7 +280,7 @@ def get_actual_retreat_time(user: User) -> int:
     # 注意：extra_retreat_time为负数时会减少撤退时间，正数时增加撤退时间
     # 最少60秒，最多1800秒
     base_retreat_time = 600
-    actual_retreat_time = base_retreat_time + stats.extra_retreat_time
+    actual_retreat_time = base_retreat_time + stats.extra_retreat_time-user.speed*40
     return int(max(60, min(1800, actual_retreat_time)))
 
 def check_retreat_status(qq: str) -> int:
