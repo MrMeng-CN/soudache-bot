@@ -20,6 +20,7 @@ from .db import save_user, save_user_equipment, save_user_equipment_storage
 
 quality_map = {0: "普通", 1: "稀有", 2: "史诗", 3: "传说"}
 equipment_type_map = {0: "武器", 1: "防具", 2: "背包", 3: "饰品", 99: "其他"}
+claimed_compensation = set()
 
 # 创建精确匹配的规则
 def is_exact_command(cmd: str) -> Rule:
@@ -542,5 +543,26 @@ async def _peizhuang_replace(event: Event, replace_idx: str = ArgPlainText()):
     save_user_equipment(qq, user.equipment)
     save_user_equipment_storage(qq, user.equipment_storage)
     await peizhuang_cmd.finish(msg + f"已用{new_eq.name}（{equipment_type_map.get(getattr(new_eq, 'equipment_type', 99), '未知')}）替换{old_eq.name}（{equipment_type_map.get(getattr(old_eq, 'equipment_type', 99), '未知')}）！")
+
+
+# 更新补偿指令：每人限领一次，再触发扣1000
+compensation_cmd = on_message("更新补偿。。。", rule=is_exact_command("更新补偿。。。"), priority=10)
+@compensation_cmd.handle()
+async def _compensation_handler(bot: Bot, event: Event):
+    qq = event.get_user_id()
+    user = users.get(qq)
+    if not user:
+        user = user_init(qq)
+    msg = MessageSegment.at(qq) + "\n"
+    if qq not in claimed_compensation:
+        claimed_compensation.add(qq)
+        user.gold += 20000
+        save_user(user)
+        await compensation_cmd.finish(msg + f"更新补偿已领取：+20000哈哈币\n当前哈哈币：{user.gold}")
+    else:
+        user.gold -= 1000
+        save_user(user)
+        await compensation_cmd.finish(msg + f"贪婪之罪，扣1000哈哈币\n当前哈哈币：{user.gold}")
+
 
 
